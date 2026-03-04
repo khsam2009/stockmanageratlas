@@ -55,12 +55,12 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        background: "linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%)",
+        background: "linear-gradient(135deg, #1e40af 0%, #122c74 100%)",
         padding: "24px",
       }}
     >
       {/* Logo / Header */}
-      <div style={{ textAlign: "center", marginBottom: "32px" }}>
+      <div style={{ textAlign: "center", marginBottom: "38px" , marginTop: "-100px"}}>
         <div
           style={{
             width: "72px",
@@ -262,6 +262,8 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
             )}
           </button>
         </form>
+        
+      </div>
 
       <style>{`
         @keyframes spin {

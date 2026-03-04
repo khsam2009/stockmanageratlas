@@ -27,7 +27,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
 
     setLoading(true);
     try {
-      const user = await loginUser(email.trim(), password);
+      const user = await loginUser(email.trim(), password.trim());
       onLogin(user);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Erreur de connexion.";

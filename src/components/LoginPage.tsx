@@ -263,24 +263,6 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
           </button>
         </form>
 
-        {/* Default credentials hint */}
-        <div
-          style={{
-            marginTop: "20px",
-            padding: "12px",
-            background: "#f0f9ff",
-            borderRadius: "10px",
-            border: "1px solid #bae6fd",
-          }}
-        >
-          <p style={{ fontSize: "12px", color: "#0369a1", margin: 0, textAlign: "center" }}>
-            <strong>Compte admin par défaut :</strong>
-            <br />
-            admin@stockmanager.com / Admin@123
-          </p>
-        </div>
-      </div>
-
       <style>{`
         @keyframes spin {
           to { transform: rotate(360deg); }

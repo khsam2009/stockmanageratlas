@@ -6,17 +6,22 @@ import { getProducts, addProduct, updateProduct, deleteProduct } from "@/lib/fir
 import type { Product } from "@/lib/types";
 
 const CATEGORIES = [
-  "Matières premières",
-  "Consommables",
-  "Pièces détachées",
-  "Outillage",
-  "Équipements",
-  "Produits finis",
+  "Linge de lit",
+  "Linge de bain",
+  "Matelas 01 place",
+  "Matelas 01 place rouler",
+  "Matelas 02 place",
+  "Matelas 02 places rouler",
+  "Sommier 01 place",
+  "Sommier 02 places",
+  "Tete de lit 01 place",
+  "Tete de lit 02 places",
+  "Meuble de Maison",
   "Emballages",
   "Autres",
 ];
 
-const UNITS = ["pcs", "kg", "g", "L", "mL", "m", "cm", "m²", "m³", "boîte", "carton", "palette"];
+const UNITS = ["pcs", "kg", "g", "L", "mL", "m", "cm", "m²", "m³", "boîte", "carton", "palette", "fut"];
 
 export default function ProduitsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -35,7 +40,7 @@ export default function ProduitsPage() {
     unit: "pcs",
     currentStock: "0",
     minStock: "0",
-    maxStock: "",
+    maxStock: "0",
     location: "",
   });
 
@@ -65,7 +70,7 @@ export default function ProduitsPage() {
       unit: "pcs",
       currentStock: "0",
       minStock: "0",
-      maxStock: "",
+      maxStock: "0",
       location: "",
     });
     setShowModal(true);
@@ -466,7 +471,7 @@ export default function ProduitsPage() {
                   className="form-input"
                   type="number"
                   min="0"
-                  placeholder="∞"
+                  placeholder="0"
                   value={form.maxStock}
                   onChange={(e) => setForm({ ...form, maxStock: e.target.value })}
                 />

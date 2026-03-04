@@ -23,7 +23,7 @@ import { initializeFirestore, persistentLocalCache } from "firebase/firestore";
 const firebaseConfig = {
   apiKey: "AIzaSyCLOK2XScNoW9WOrKbvPQ1N7Hc708hIw5A",
   authDomain: "stockmanager-e8004.firebaseapp.com",
-  databaseURL: "https://stockmanager-e8004-default-rtdb.europe-west1.firebasedatabase.app",
+//  databaseURL: "https://stockmanager-e8004-default-rtdb.europe-west1.firebasedatabase.app",
   projectId: "stockmanager-e8004",
   storageBucket: "stockmanager-e8004.firebasestorage.app",
   messagingSenderId: "215538959059",

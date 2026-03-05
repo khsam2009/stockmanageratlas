@@ -9,6 +9,8 @@ export interface Product {
   minStock: number;
   maxStock?: number;
   location?: string;
+  active: boolean;
+  minStockAlarm: boolean;
   createdAt: Date;
   updatedAt: Date;
 }

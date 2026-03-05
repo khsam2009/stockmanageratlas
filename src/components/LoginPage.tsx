@@ -27,7 +27,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
 
     setLoading(true);
     try {
-      const user = await loginUser(email.trim(), password.trim());
+      const user = await loginUser(email.trim(), password);
       onLogin(user);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Erreur de connexion.";
@@ -55,12 +55,12 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        background: "linear-gradient(135deg, #1e40af 0%, #122c74 100%)",
+        background: "linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%)",
         padding: "24px",
       }}
     >
       {/* Logo / Header */}
-      <div style={{ textAlign: "center", marginBottom: "38px" , marginTop: "-100px"}}>
+      <div style={{ textAlign: "center", marginBottom: "32px", marginTop: "-100px" }}>
         <div
           style={{
             width: "72px",
@@ -261,8 +261,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
               </>
             )}
           </button>
-        </form>
-        
+        </form>       
       </div>
 
       <style>{`

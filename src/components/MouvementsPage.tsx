@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, TrendingUp, TrendingDown, Search, X, Filter } from "lucide-react";
+import { Plus, TrendingUp, TrendingDown, Search, X, Filter, ScanLine } from "lucide-react";
 import { getMovements, addMovement, getProducts } from "@/lib/firestore";
 import type { StockMovement, Product } from "@/lib/types";
 import ExportButton from "@/components/ExportButton";
+import SearchableSelect from "@/components/SearchableSelect";
+import BarcodeScannerModal from "@/components/BarcodeScannerModal";
 import {
   exportMouvementsPDF,
   exportMouvementsExcel,
@@ -19,6 +21,7 @@ export default function MouvementsPage() {
   const [filter, setFilter] = useState<"all" | "entree" | "sortie">("all");
   const [search, setSearch] = useState("");
   const [saving, setSaving] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
 
   const [form, setForm] = useState({
     type: "entree" as "entree" | "sortie",
@@ -55,6 +58,11 @@ export default function MouvementsPage() {
       m.reason.toLowerCase().includes(search.toLowerCase());
     return matchFilter && matchSearch;
   });
+
+  const filteredProducts = products.map((p) => ({
+      value: p.id,
+      label: `[${p.code}] ${p.name} - Stock: ${p.currentStock} ${p.unit}`,
+    }));
 
   const handleSubmit = async () => {
     if (!form.productId || !form.quantity || !form.reason || !form.operator) {
@@ -103,6 +111,15 @@ export default function MouvementsPage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  // Handler for barcode scanner
+  const handleProductScanned = (product: Product, quantity: number) => {
+    setForm({
+      ...form,
+      productId: product.id,
+      quantity: String(quantity),
+    });
   };
 
   return (
@@ -248,6 +265,14 @@ export default function MouvementsPage() {
         <Plus size={24} />
       </button>
 
+      {/* Barcode Scanner Modal */}
+      <BarcodeScannerModal
+        isOpen={showScanner}
+        onClose={() => setShowScanner(false)}
+        products={products}
+        onProductScanned={handleProductScanned}
+      />
+
       {/* Modal */}
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
@@ -289,19 +314,35 @@ export default function MouvementsPage() {
             </div>
 
             <div className="form-group">
-              <label className="form-label">Produit *</label>
-              <select
-                className="form-input"
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <label className="form-label" style={{ margin: 0 }}>Produit *</label>
+                <button
+                  onClick={() => setShowScanner(true)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    padding: "6px 12px",
+                    background: form.type === "entree" ? "#16a34a" : "#dc2626",
+                    color: "white",
+                    border: "none",
+                    borderRadius: "6px",
+                    fontSize: "12px",
+                    fontWeight: "600",
+                    cursor: "pointer",
+                  }}
+                >
+                  <ScanLine size={14} />
+                  Scanner
+                </button>
+              </div>
+              <SearchableSelect
+                options={filteredProducts}
                 value={form.productId}
-                onChange={(e) => setForm({ ...form, productId: e.target.value })}
-              >
-                <option value="">Sélectionner un produit</option>
-                {products.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    [{p.code}] {p.name} - Stock: {p.currentStock} {p.unit}
-                  </option>
-                ))}
-              </select>
+                onChange={(value) => setForm({ ...form, productId: value })}
+                placeholder="Sélectionner un produit"
+                searchPlaceholder="Rechercher par nom ou code..."
+              />
             </div>
 
             <div className="form-group">

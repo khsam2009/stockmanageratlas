@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, X, CheckCircle, Eye, Trash2, PackagePlus } from "lucide-react";
+import { Plus, X, CheckCircle, Eye, Trash2, PackagePlus, ScanLine } from "lucide-react";
 import { getReceptions, addReception, validateReception, getProducts } from "@/lib/firestore";
 import type { BonReception, BonReceptionItem, Product } from "@/lib/types";
 import ExportButton from "@/components/ExportButton";
+import SearchableSelect from "@/components/SearchableSelect";
+import BarcodeScannerModal from "@/components/BarcodeScannerModal";
 import {
   exportReceptionPDF,
   exportReceptionExcel,
@@ -33,6 +35,8 @@ export default function ReceptionPage() {
     quantityReceived: "",
   });
 
+  const [showScanner, setShowScanner] = useState(false);
+
   const loadData = async () => {
     setLoading(true);
     try {
@@ -53,6 +57,37 @@ export default function ReceptionPage() {
   const generateNumber = () => {
     const now = new Date();
     return `BR-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}-${String(now.getTime()).slice(-4)}`;
+  };
+
+  const filteredProducts = products.map((p) => ({
+      value: p.id,
+      label: `[${p.code}] ${p.name}`,
+    }));
+
+  // Handler for barcode scanner
+  const handleProductScanned = (product: Product, quantity: number) => {
+    const existingIndex = form.items.findIndex(item => item.productId === product.id);
+    if (existingIndex >= 0) {
+      // Update existing item
+      const updatedItems = [...form.items];
+      updatedItems[existingIndex] = {
+        ...updatedItems[existingIndex],
+        quantityOrdered: updatedItems[existingIndex].quantityOrdered + quantity,
+        quantityReceived: updatedItems[existingIndex].quantityReceived + quantity,
+      };
+      setForm({ ...form, items: updatedItems });
+    } else {
+      // Add new item
+      const item: BonReceptionItem = {
+        productId: product.id,
+        productName: product.name,
+        productCode: product.code,
+        quantityOrdered: quantity,
+        quantityReceived: quantity,
+        unit: product.unit,
+      };
+      setForm({ ...form, items: [...form.items, item] });
+    }
   };
 
   const addItem = () => {
@@ -210,6 +245,14 @@ export default function ReceptionPage() {
         <Plus size={24} />
       </button>
 
+      {/* Barcode Scanner Modal */}
+      <BarcodeScannerModal
+        isOpen={showScanner}
+        onClose={() => setShowScanner(false)}
+        products={products}
+        onProductScanned={handleProductScanned}
+      />
+
       {/* Create Modal */}
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
@@ -254,7 +297,28 @@ export default function ReceptionPage() {
 
             {/* Items section */}
             <div style={{ marginBottom: "16px" }}>
-              <label className="form-label">Produits reçus *</label>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                <label className="form-label" style={{ margin: 0 }}>Produits reçus *</label>
+                <button
+                  onClick={() => setShowScanner(true)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    padding: "6px 12px",
+                    background: "#1e40af",
+                    color: "white",
+                    border: "none",
+                    borderRadius: "6px",
+                    fontSize: "12px",
+                    fontWeight: "600",
+                    cursor: "pointer",
+                  }}
+                >
+                  <ScanLine size={14} />
+                  Scanner
+                </button>
+              </div>
 
               {/* Existing items */}
               {form.items.map((item, index) => (
@@ -297,19 +361,13 @@ export default function ReceptionPage() {
                 <div style={{ fontSize: "12px", fontWeight: "600", color: "#1d4ed8", marginBottom: "8px" }}>
                   + Ajouter un produit
                 </div>
-                <select
-                  className="form-input"
-                  style={{ marginBottom: "8px" }}
+                <SearchableSelect
+                  options={filteredProducts}
                   value={newItem.productId}
-                  onChange={(e) => setNewItem({ ...newItem, productId: e.target.value })}
-                >
-                  <option value="">Sélectionner un produit</option>
-                  {products.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      [{p.code}] {p.name}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(value) => setNewItem({ ...newItem, productId: value })}
+                  placeholder="Sélectionner un produit"
+                  searchPlaceholder="Rechercher par nom ou code..."
+                />
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "8px" }}>
                   <input
                     className="form-input"

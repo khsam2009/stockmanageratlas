@@ -10,7 +10,7 @@ const CATEGORIES = [
   "Linge de bain",
   "Matelas 01 place",
   "Matelas 01 place rouler",
-  "Matelas 02 place",
+  "Matelas 02 places",
   "Matelas 02 places rouler",
   "Sommier 01 place",
   "Sommier 02 places",
@@ -21,7 +21,7 @@ const CATEGORIES = [
   "Autres",
 ];
 
-const UNITS = ["pcs", "kg", "g", "L", "mL", "m", "cm", "m²", "m³", "boîte", "carton", "palette", "fut"];
+const UNITS = ["pcs", "kg", "g", "L", "mL", "m", "cm", "m²", "m³", "boîte", "carton", "palette"];
 
 export default function ProduitsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -42,6 +42,8 @@ export default function ProduitsPage() {
     minStock: "0",
     maxStock: "0",
     location: "",
+    active: true,
+    minStockAlarm: true,
   });
 
   const loadData = async () => {
@@ -72,6 +74,8 @@ export default function ProduitsPage() {
       minStock: "0",
       maxStock: "0",
       location: "",
+      active: true,
+      minStockAlarm: true,
     });
     setShowModal(true);
   };
@@ -86,8 +90,10 @@ export default function ProduitsPage() {
       unit: product.unit,
       currentStock: String(product.currentStock),
       minStock: String(product.minStock),
-      maxStock: product.maxStock ? String(product.maxStock) : "",
+      maxStock: product.maxStock ? String(product.maxStock) : "0",
       location: product.location || "",
+      active: product.active ?? true,
+      minStockAlarm: product.minStockAlarm ?? true,
     });
     setShowModal(true);
   };
@@ -110,6 +116,8 @@ export default function ProduitsPage() {
         minStock: parseInt(form.minStock) || 0,
         maxStock: form.maxStock ? parseInt(form.maxStock) : undefined,
         location: form.location,
+        active: form.active,
+        minStockAlarm: form.minStockAlarm,
       };
 
       if (editProduct) {
@@ -155,14 +163,17 @@ export default function ProduitsPage() {
   });
 
   const getStockStatus = (product: Product) => {
+    if (!product.active) return "inactive";
     if (product.currentStock === 0) return "danger";
-    if (product.currentStock <= product.minStock) return "warning";
+    if (product.minStockAlarm && product.currentStock <= product.minStock) return "warning";
     return "success";
   };
 
   const getStockBadge = (product: Product) => {
     const status = getStockStatus(product);
     switch (status) {
+      case "inactive":
+        return <span className="badge" style={{ background: "#e2e8f0", color: "#64748b" }}>Inactif</span>;
       case "danger":
         return <span className="badge badge-danger">Rupture</span>;
       case "warning":
@@ -312,8 +323,14 @@ export default function ProduitsPage() {
                     </div>
                     {product.currentStock <= product.minStock && (
                       <div style={{ display: "flex", alignItems: "center", gap: "4px", color: "#d97706" }}>
-                        <AlertTriangle size={12} />
-                        <span style={{ fontSize: "11px" }}>Min: {product.minStock}</span>
+                        <AlertTriangle size={13} />
+                        <span style={{ fontSize: "12px" }}>Min: {product.minStock}</span>
+                      </div>
+                    )}
+                    {product.currentStock > product.minStock && (
+                      <div style={{ display: "flex", alignItems: "center", gap: "4px", color: "#0673d9" }}>
+                        <AlertTriangle size={13} />
+                        <span style={{ fontSize: "12px" }}>Min: {product.minStock}</span>
                       </div>
                     )}
                   </div>
@@ -486,6 +503,44 @@ export default function ProduitsPage() {
                 value={form.location}
                 onChange={(e) => setForm({ ...form, location: e.target.value })}
               />
+            </div>
+
+            {/* Checkboxes for active and alarm */}
+            <div style={{ display: "flex", gap: "16px", marginTop: "8px", marginBottom: "16px" }}>
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  cursor: "pointer",
+                  fontSize: "14px",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={form.active}
+                  onChange={(e) => setForm({ ...form, active: e.target.checked })}
+                  style={{ width: "18px", height: "18px" }}
+                />
+                <span>Produit actif</span>
+              </label>
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  cursor: "pointer",
+                  fontSize: "14px",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={form.minStockAlarm}
+                  onChange={(e) => setForm({ ...form, minStockAlarm: e.target.checked })}
+                  style={{ width: "18px", height: "18px" }}
+                />
+                <span>Alarme stock minimum</span>
+              </label>
             </div>
 
             <button className="btn-primary" onClick={handleSubmit} disabled={saving}>

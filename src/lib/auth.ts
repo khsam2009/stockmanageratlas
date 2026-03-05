@@ -52,8 +52,6 @@ export async function getAllUsers(): Promise<AppUser[]> {
 
 export async function loginUser(email: string, password: string): Promise<AppUser> {
   const credential = await signInWithEmailAndPassword(auth, email, password);
-
-  console.log(credential);
   const profile = await getUserProfile(credential.user.uid);
   if (!profile) {
     throw new Error("Profil utilisateur introuvable. Contactez l'administrateur.");

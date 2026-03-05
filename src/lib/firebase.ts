@@ -19,20 +19,19 @@ import { initializeFirestore, persistentLocalCache } from "firebase/firestore";
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ,
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID ,
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID 
-};*/ 
+}; */ 
 const firebaseConfig = {
   apiKey: "AIzaSyCLOK2XScNoW9WOrKbvPQ1N7Hc708hIw5A",
   authDomain: "stockmanager-e8004.firebaseapp.com",
-//  databaseURL: "https://stockmanager-e8004-default-rtdb.europe-west1.firebasedatabase.app",
   projectId: "stockmanager-e8004",
   storageBucket: "stockmanager-e8004.firebasestorage.app",
   messagingSenderId: "215538959059",
   appId: "1:215538959059:web:e506d2f2a0dc6e0121ca26",
   measurementId: "G-WLCFNXM9FH"
 };
-//console.log(firebaseConfig.databaseURL);
-// Initialize Firebase
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+console.log(firebaseConfig.apiKey);
+// Initialize Firebase ** 
+const app =  initializeApp(firebaseConfig)  ;
 //const analytics = getAnalytics(app);
 
 

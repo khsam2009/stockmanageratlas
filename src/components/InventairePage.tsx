@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, X, CheckCircle, Eye, ClipboardList, AlertTriangle } from "lucide-react";
-import { getInventories, addInventory, updateInventory, validateInventory, getProducts } from "@/lib/firestore";
-import type { Inventory, InventoryItem, Product } from "@/lib/types";
+import { Plus, X, CheckCircle, Eye, ClipboardList, AlertTriangle, Loader2 } from "lucide-react";
+import { getInventories, addInventory, updateInventory, validateInventory, getProducts, getOperators } from "@/lib/firestore";
+import { useAuth } from "@/lib/AuthContext";
+import type { Inventory, InventoryItem, Product, Operator } from "@/lib/types";
 import ExportButton from "@/components/ExportButton";
+import SearchableSelect from "@/components/SearchableSelect";
 import {
   exportInventairePDF,
   exportInventaireExcel,
@@ -12,8 +14,10 @@ import {
 } from "@/lib/exportUtils";
 
 export default function InventairePage() {
+  const { appUser } = useAuth();
   const [inventories, setInventories] = useState<Inventory[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [operators, setOperators] = useState<Operator[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [showDetail, setShowDetail] = useState<Inventory | null>(null);
@@ -31,9 +35,14 @@ export default function InventairePage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [invs, prods] = await Promise.all([getInventories(), getProducts()]);
-      setInventories(invs);
-      setProducts(prods);
+      const [invsResult, prodsResult, opsResult] = await Promise.all([
+        getInventories(),
+        getProducts(),
+        getOperators(),
+      ]);
+      setInventories(invsResult.inventories);
+      setProducts(prodsResult.products);
+      setOperators(opsResult);
     } catch (error) {
       console.error(error);
     } finally {
@@ -44,6 +53,13 @@ export default function InventairePage() {
   useEffect(() => {
     loadData();
   }, []);
+
+  const operatorOptions = operators
+    .filter((o) => o.active)
+    .map((o) => ({
+      value: o.name,
+      label: o.isMain ? `⭐ ${o.name}` : o.name,
+    }));
 
   const handleCreateInventory = async () => {
     if (!form.name || !form.operator) {
@@ -71,6 +87,7 @@ export default function InventairePage() {
         status: "en_cours",
         items,
         operator: form.operator,
+        operatorEmail: appUser?.email,
         notes: form.notes,
         createdAt: new Date(),
       });
@@ -113,7 +130,7 @@ export default function InventairePage() {
 
     setValidating(true);
     try {
-      await validateInventory(inventory.id, inventory);
+      await validateInventory(inventory.id, inventory, appUser?.email);
       setShowDetail(null);
       await loadData();
     } catch (error) {
@@ -151,8 +168,19 @@ export default function InventairePage() {
       </div>
 
       <div className="page-content">
-        {/* Tab selector */}
-        <div className="tab-bar">
+        {/* Tab selector - Sticky header */}
+        <div
+          className="tab-bar"
+          style={{
+            position: "sticky",
+            top: "0",
+            background: "white",
+            zIndex: 10,
+            paddingTop: "8px",
+            marginBottom: "12px",
+            borderBottom: "1px solid #e2e8f0",
+          }}
+        >
           <button
             className={`tab-item ${activeTab === "annuel" ? "active" : ""}`}
             onClick={() => setActiveTab("annuel")}
@@ -171,6 +199,13 @@ export default function InventairePage() {
 
         {loading ? (
           <div style={{ textAlign: "center", padding: "40px", color: "#64748b" }}>
+            <Loader2 size={32} className="animate-spin" style={{ margin: "0 auto 12px" }} />
+            <style>{`
+              @keyframes spin {
+                from { transform: rotate(0deg); }
+                to { transform: rotate(360deg); }
+              }
+            `}</style>
             Chargement...
           </div>
         ) : filteredInventories.length === 0 ? (
@@ -295,11 +330,12 @@ export default function InventairePage() {
 
             <div className="form-group">
               <label className="form-label">Responsable *</label>
-              <input
-                className="form-input"
-                placeholder="Votre nom"
+              <SearchableSelect
+                options={operatorOptions}
                 value={form.operator}
-                onChange={(e) => setForm({ ...form, operator: e.target.value })}
+                onChange={(value) => setForm({ ...form, operator: value })}
+                placeholder="Sélectionner un opérateur"
+                searchPlaceholder="Rechercher un opérateur..."
               />
             </div>
 

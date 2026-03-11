@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, X, CheckCircle, Eye, Trash2, PackagePlus, ScanLine } from "lucide-react";
-import { getReceptions, addReception, validateReception, getProducts } from "@/lib/firestore";
-import type { BonReception, BonReceptionItem, Product } from "@/lib/types";
+import { Plus, X, CheckCircle, Eye, Trash2, PackagePlus, ScanLine, Loader2 } from "lucide-react";
+import { getReceptions, addReception, validateReception, getProducts, getSuppliers, getOperators } from "@/lib/firestore";
+import { useAuth } from "@/lib/AuthContext";
+import type { BonReception, BonReceptionItem, Product, Supplier, Operator } from "@/lib/types";
 import ExportButton from "@/components/ExportButton";
 import SearchableSelect from "@/components/SearchableSelect";
 import BarcodeScannerModal from "@/components/BarcodeScannerModal";
@@ -14,8 +15,11 @@ import {
 } from "@/lib/exportUtils";
 
 export default function ReceptionPage() {
+  const { appUser } = useAuth();
   const [receptions, setReceptions] = useState<BonReception[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [operators, setOperators] = useState<Operator[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [showDetail, setShowDetail] = useState<BonReception | null>(null);
@@ -40,9 +44,16 @@ export default function ReceptionPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [recs, prods] = await Promise.all([getReceptions(), getProducts()]);
-      setReceptions(recs);
-      setProducts(prods);
+      const [recsResult, prodsResult, suppsResult, opsResult] = await Promise.all([
+        getReceptions(),
+        getProducts(),
+        getSuppliers(),
+        getOperators(),
+      ]);
+      setReceptions(recsResult.receptions);
+      setProducts(prodsResult.products);
+      setSuppliers(suppsResult);
+      setOperators(opsResult);
     } catch (error) {
       console.error(error);
     } finally {
@@ -62,6 +73,20 @@ export default function ReceptionPage() {
   const filteredProducts = products.map((p) => ({
       value: p.id,
       label: `[${p.code}] ${p.name}`,
+    }));
+
+  const supplierOptions = suppliers
+    .filter((s) => s.active)
+    .map((s) => ({
+      value: s.name,
+      label: s.isMain ? `⭐ ${s.name}` : s.name,
+    }));
+
+  const operatorOptions = operators
+    .filter((o) => o.active)
+    .map((o) => ({
+      value: o.name,
+      label: o.isMain ? `⭐ ${o.name}` : o.name,
     }));
 
   // Handler for barcode scanner
@@ -131,6 +156,7 @@ export default function ReceptionPage() {
         items: form.items,
         totalItems: form.items.length,
         operator: form.operator,
+        operatorEmail: appUser?.email,
         notes: form.notes,
         createdAt: new Date(),
       });
@@ -151,7 +177,7 @@ export default function ReceptionPage() {
 
     setValidating(true);
     try {
-      await validateReception(reception.id, reception);
+      await validateReception(reception.id, reception, appUser?.email);
       setShowDetail(null);
       await loadData();
     } catch (error) {
@@ -183,6 +209,13 @@ export default function ReceptionPage() {
       <div className="page-content">
         {loading ? (
           <div style={{ textAlign: "center", padding: "40px", color: "#64748b" }}>
+            <Loader2 size={32} className="animate-spin" style={{ margin: "0 auto 12px" }} />
+            <style>{`
+              @keyframes spin {
+                from { transform: rotate(0deg); }
+                to { transform: rotate(360deg); }
+              }
+            `}</style>
             Chargement...
           </div>
         ) : receptions.length === 0 ? (
@@ -277,21 +310,23 @@ export default function ReceptionPage() {
 
             <div className="form-group">
               <label className="form-label">Fournisseur *</label>
-              <input
-                className="form-input"
-                placeholder="Nom du fournisseur"
+              <SearchableSelect
+                options={supplierOptions}
                 value={form.supplier}
-                onChange={(e) => setForm({ ...form, supplier: e.target.value })}
+                onChange={(value) => setForm({ ...form, supplier: value })}
+                placeholder="Sélectionner un fournisseur"
+                searchPlaceholder="Rechercher un fournisseur..."
               />
             </div>
 
             <div className="form-group">
               <label className="form-label">Opérateur *</label>
-              <input
-                className="form-input"
-                placeholder="Votre nom"
+              <SearchableSelect
+                options={operatorOptions}
                 value={form.operator}
-                onChange={(e) => setForm({ ...form, operator: e.target.value })}
+                onChange={(value) => setForm({ ...form, operator: value })}
+                placeholder="Sélectionner un opérateur"
+                searchPlaceholder="Rechercher un opérateur..."
               />
             </div>
 

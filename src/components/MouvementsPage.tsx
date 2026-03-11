@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, TrendingUp, TrendingDown, Search, X, Filter, ScanLine } from "lucide-react";
-import { getMovements, addMovement, getProducts } from "@/lib/firestore";
-import type { StockMovement, Product } from "@/lib/types";
+import { Plus, TrendingUp, TrendingDown, Search, X, Filter, ScanLine, Loader2 } from "lucide-react";
+import { getMovements, addMovement, getProducts, getOperators } from "@/lib/firestore";
+import { useAuth } from "@/lib/AuthContext";
+import type { StockMovement, Product, Operator } from "@/lib/types";
 import ExportButton from "@/components/ExportButton";
 import SearchableSelect from "@/components/SearchableSelect";
 import BarcodeScannerModal from "@/components/BarcodeScannerModal";
@@ -14,8 +15,10 @@ import {
 } from "@/lib/exportUtils";
 
 export default function MouvementsPage() {
+  const { appUser } = useAuth();
   const [movements, setMovements] = useState<StockMovement[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [operators, setOperators] = useState<Operator[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [filter, setFilter] = useState<"all" | "entree" | "sortie">("all");
@@ -36,9 +39,10 @@ export default function MouvementsPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [movs, prods] = await Promise.all([getMovements(), getProducts()]);
-      setMovements(movs);
-      setProducts(prods);
+      const [movsResult, prodsResult, opsResult] = await Promise.all([getMovements(), getProducts(), getOperators()]);
+      setMovements(movsResult.movements);
+      setProducts(prodsResult.products);
+      setOperators(opsResult);
     } catch (error) {
       console.error(error);
     } finally {
@@ -62,6 +66,13 @@ export default function MouvementsPage() {
   const filteredProducts = products.map((p) => ({
       value: p.id,
       label: `[${p.code}] ${p.name} - Stock: ${p.currentStock} ${p.unit}`,
+    }));
+
+  const operatorOptions = operators
+    .filter((o) => o.active)
+    .map((o) => ({
+      value: o.name,
+      label: o.isMain ? `⭐ ${o.name}` : o.name,
     }));
 
   const handleSubmit = async () => {
@@ -90,6 +101,7 @@ export default function MouvementsPage() {
         reason: form.reason,
         reference: form.reference,
         operator: form.operator,
+        operatorEmail: appUser?.email,
         date: new Date(),
         notes: form.notes,
       });
@@ -142,48 +154,66 @@ export default function MouvementsPage() {
       </div>
 
       <div className="page-content">
-        {/* Search */}
-        <div style={{ position: "relative", marginBottom: "12px" }}>
-          <Search
-            size={16}
-            style={{
-              position: "absolute",
-              left: "12px",
-              top: "50%",
-              transform: "translateY(-50%)",
-              color: "#94a3b8",
-            }}
-          />
-          <input
-            className="form-input"
-            style={{ paddingLeft: "36px" }}
-            placeholder="Rechercher un produit..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
+        {/* Search - Sticky header */}
+        <div
+          style={{
+            position: "sticky",
+            top: "0",
+            background: "white",
+            zIndex: 10,
+            paddingTop: "8px",
+            marginBottom: "12px",
+          }}
+        >
+          <div style={{ position: "relative", marginBottom: "12px" }}>
+            <Search
+              size={16}
+              style={{
+                position: "absolute",
+                left: "12px",
+                top: "50%",
+                transform: "translateY(-50%)",
+                color: "#94a3b8",
+              }}
+            />
+            <input
+              className="form-input"
+              style={{ paddingLeft: "36px" }}
+              placeholder="Rechercher un produit..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
 
-        {/* Filter tabs */}
-        <div className="tab-bar">
-          {[
-            { id: "all", label: "Tous" },
-            { id: "entree", label: "Entrées" },
-            { id: "sortie", label: "Sorties" },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              className={`tab-item ${filter === tab.id ? "active" : ""}`}
-              onClick={() => setFilter(tab.id as "all" | "entree" | "sortie")}
-              style={{ border: "none", background: "none", cursor: "pointer" }}
-            >
-              {tab.label}
-            </button>
-          ))}
+          {/* Filter tabs */}
+          <div className="tab-bar">
+            {[
+              { id: "all", label: "Tous" },
+              { id: "entree", label: "Entrées" },
+              { id: "sortie", label: "Sorties" },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                className={`tab-item ${filter === tab.id ? "active" : ""}`}
+                onClick={() => setFilter(tab.id as "all" | "entree" | "sortie")}
+                style={{ border: "none", background: "none", cursor: "pointer" }}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Movements list */}
         {loading ? (
           <div style={{ textAlign: "center", padding: "40px", color: "#64748b" }}>
+            <Loader2 size={32} className="animate-spin" style={{ margin: "0 auto 12px" }} />
+            <style>{`
+              @keyframes spin {
+                from { transform: rotate(0deg); }
+                to { transform: rotate(360deg); }
+              }
+            `}</style>
             Chargement...
           </div>
         ) : filteredMovements.length === 0 ? (
@@ -379,11 +409,12 @@ export default function MouvementsPage() {
 
             <div className="form-group">
               <label className="form-label">Opérateur *</label>
-              <input
-                className="form-input"
-                placeholder="Votre nom"
+              <SearchableSelect
+                options={operatorOptions}
                 value={form.operator}
-                onChange={(e) => setForm({ ...form, operator: e.target.value })}
+                onChange={(value) => setForm({ ...form, operator: value })}
+                placeholder="Sélectionner un opérateur"
+                searchPlaceholder="Rechercher un opérateur..."
               />
             </div>
 

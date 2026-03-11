@@ -11,6 +11,8 @@ import {
   ShieldCheck,
   LogOut,
   User,
+  Truck,
+  Users,
 } from "lucide-react";
 import type { NavPage } from "@/lib/types";
 import { useAuth } from "@/lib/AuthContext";
@@ -23,13 +25,15 @@ import SortiePage from "@/components/SortiePage";
 import InventairePage from "@/components/InventairePage";
 import ProduitsPage from "@/components/ProduitsPage";
 import AdminPage from "@/components/AdminPage";
+import FournisseursPage from "@/components/FournisseursPage";
+import OperateursPage from "@/components/OperateursPage";
 
 interface NavItem {
   id: NavPage;
   label: string;
   icon: React.ReactNode;
   adminOnly?: boolean;
-  permission?: "dashboard" | "mouvements" | "reception" | "sortie" | "inventaire" | "produits";
+  permission?: "dashboard" | "mouvements" | "reception" | "sortie" | "inventaire" | "produits" | "fournisseurs" | "operateurs";
 }
 
 const ALL_NAV_ITEMS: NavItem[] = [
@@ -68,6 +72,18 @@ const ALL_NAV_ITEMS: NavItem[] = [
     label: "Produits",
     icon: <Package size={22} />,
     permission: "produits",
+  },
+  {
+    id: "fournisseurs",
+    label: "Fournisseurs",
+    icon: <Truck size={22} />,
+    permission: "fournisseurs",
+  },
+  {
+    id: "operateurs",
+    label: "Opérateurs",
+    icon: <Users size={22} />,
+    permission: "operateurs",
   },
   {
     id: "admin",
@@ -151,6 +167,10 @@ export default function Home() {
         return <InventairePage />;
       case "produits":
         return <ProduitsPage />;
+      case "fournisseurs":
+        return <FournisseursPage />;
+      case "operateurs":
+        return <OperateursPage />;
       case "admin":
         return <AdminPage />;
       default:

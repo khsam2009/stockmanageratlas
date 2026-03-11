@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, X, CheckCircle, Eye, Trash2, PackageMinus, ScanLine } from "lucide-react";
-import { getSorties, addSortie, validateSortie, getProducts } from "@/lib/firestore";
-import type { BonSortie, BonSortieItem, Product } from "@/lib/types";
+import { Plus, X, CheckCircle, Eye, Trash2, PackageMinus, ScanLine, Loader2 } from "lucide-react";
+import { getSorties, addSortie, validateSortie, getProducts, getOperators } from "@/lib/firestore";
+import { useAuth } from "@/lib/AuthContext";
+import type { BonSortie, BonSortieItem, Product, Operator } from "@/lib/types";
 import ExportButton from "@/components/ExportButton";
 import SearchableSelect from "@/components/SearchableSelect";
 import BarcodeScannerModal from "@/components/BarcodeScannerModal";
@@ -14,8 +15,10 @@ import {
 } from "@/lib/exportUtils";
 
 export default function SortiePage() {
+  const { appUser } = useAuth();
   const [sorties, setSorties] = useState<BonSortie[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [operators, setOperators] = useState<Operator[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [showDetail, setShowDetail] = useState<BonSortie | null>(null);
@@ -41,9 +44,14 @@ export default function SortiePage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [sors, prods] = await Promise.all([getSorties(), getProducts()]);
-      setSorties(sors);
-      setProducts(prods);
+      const [sorsResult, prodsResult, opsResult] = await Promise.all([
+        getSorties(),
+        getProducts(),
+        getOperators(),
+      ]);
+      setSorties(sorsResult.sorties);
+      setProducts(prodsResult.products);
+      setOperators(opsResult);
     } catch (error) {
       console.error(error);
     } finally {
@@ -63,6 +71,13 @@ export default function SortiePage() {
   const filteredProducts = products.map((p) => ({
       value: p.id,
       label: `[${p.code}] ${p.name} - Stock: ${p.currentStock} ${p.unit}`,
+    }));
+
+  const operatorOptions = operators
+    .filter((o) => o.active)
+    .map((o) => ({
+      value: o.name,
+      label: o.isMain ? `⭐ ${o.name}` : o.name,
     }));
 
   // Handler for barcode scanner
@@ -139,6 +154,7 @@ export default function SortiePage() {
         items: form.items,
         totalItems: form.items.length,
         operator: form.operator,
+        operatorEmail: appUser?.email,
         notes: form.notes,
         createdAt: new Date(),
       });
@@ -159,7 +175,7 @@ export default function SortiePage() {
 
     setValidating(true);
     try {
-      await validateSortie(sortie.id, sortie);
+      await validateSortie(sortie.id, sortie, appUser?.email);
       setShowDetail(null);
       await loadData();
     } catch (error) {
@@ -191,6 +207,13 @@ export default function SortiePage() {
       <div className="page-content">
         {loading ? (
           <div style={{ textAlign: "center", padding: "40px", color: "#64748b" }}>
+            <Loader2 size={32} className="animate-spin" style={{ margin: "0 auto 12px" }} />
+            <style>{`
+              @keyframes spin {
+                from { transform: rotate(0deg); }
+                to { transform: rotate(360deg); }
+              }
+            `}</style>
             Chargement...
           </div>
         ) : sorties.length === 0 ? (
@@ -301,11 +324,12 @@ export default function SortiePage() {
 
             <div className="form-group">
               <label className="form-label">Opérateur *</label>
-              <input
-                className="form-input"
-                placeholder="Votre nom"
+              <SearchableSelect
+                options={operatorOptions}
                 value={form.operator}
-                onChange={(e) => setForm({ ...form, operator: e.target.value })}
+                onChange={(value) => setForm({ ...form, operator: value })}
+                placeholder="Sélectionner un opérateur"
+                searchPlaceholder="Rechercher un opérateur..."
               />
             </div>
 

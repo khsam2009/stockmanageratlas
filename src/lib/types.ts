@@ -9,10 +9,13 @@ export interface Product {
   minStock: number;
   maxStock?: number;
   location?: string;
+  codebarreEAN13?: string;
   active: boolean;
   minStockAlarm: boolean;
   createdAt: Date;
   updatedAt: Date;
+  createdByEmail?: string;
+  updatedByEmail?: string;
 }
 
 export interface StockMovement {
@@ -25,6 +28,7 @@ export interface StockMovement {
   reason: string;
   reference?: string;
   operator: string;
+  operatorEmail?: string;
   date: Date;
   notes?: string;
 }
@@ -38,6 +42,7 @@ export interface BonReception {
   items: BonReceptionItem[];
   totalItems: number;
   operator: string;
+  operatorEmail?: string;
   notes?: string;
   createdAt: Date;
 }
@@ -61,6 +66,7 @@ export interface BonSortie {
   items: BonSortieItem[];
   totalItems: number;
   operator: string;
+  operatorEmail?: string;
   notes?: string;
   createdAt: Date;
 }
@@ -83,6 +89,7 @@ export interface Inventory {
   status: "en_cours" | "termine" | "valide";
   items: InventoryItem[];
   operator: string;
+  operatorEmail?: string;
   notes?: string;
   createdAt: Date;
 }
@@ -98,9 +105,9 @@ export interface InventoryItem {
   notes?: string;
 }
 
-export type NavPage = "dashboard" | "mouvements" | "reception" | "sortie" | "inventaire" | "produits" | "admin";
+export type NavPage = "dashboard" | "mouvements" | "reception" | "sortie" | "inventaire" | "produits" | "admin" | "fournisseurs" | "operateurs";
 
-export type PagePermission = "dashboard" | "mouvements" | "reception" | "sortie" | "inventaire" | "produits";
+export type PagePermission = "dashboard" | "mouvements" | "reception" | "sortie" | "inventaire" | "produits" | "fournisseurs" | "operateurs";
 
 export interface AppUser {
   uid: string;
@@ -119,4 +126,35 @@ export interface CreateUserData {
   displayName: string;
   role: "admin" | "user";
   permissions: PagePermission[];
+}
+
+export interface Supplier {
+  id: string;
+  name: string;
+  code?: string;
+  contact?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  isMain: boolean;
+  active: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  createdByEmail?: string;
+  updatedByEmail?: string;
+}
+
+export interface Operator {
+  id: string;
+  name: string;
+  code?: string;
+  role?: string;
+  phone?: string;
+  email?: string;
+  isMain: boolean;
+  active: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  createdByEmail?: string;
+  updatedByEmail?: string;
 }

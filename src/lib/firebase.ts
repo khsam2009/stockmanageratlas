@@ -19,7 +19,7 @@ import { initializeFirestore, persistentLocalCache } from "firebase/firestore";
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ,
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID ,
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID 
-};*/ 
+}; */ 
 const firebaseConfig = {
   apiKey: "AIzaSyCLOK2XScNoW9WOrKbvPQ1N7Hc708hIw5A",
   authDomain: "stockmanager-e8004.firebaseapp.com",

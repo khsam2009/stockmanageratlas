@@ -30,10 +30,10 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [prods, movs, recs] = await Promise.all([getProducts(), getMovements(), getReceptions()]);
-      setProducts(prods);
-      setMovements(movs);
-      setReceptions(recs);
+      const [prodsResult, movsResult, recsResult] = await Promise.all([getProducts(), getMovements(), getReceptions()]);
+      setProducts(prodsResult.products);
+      setMovements(movsResult.movements);
+      setReceptions(recsResult.receptions);
     } catch (error) {
       console.error("Error loading data:", error);
     } finally {

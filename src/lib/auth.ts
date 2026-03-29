@@ -131,8 +131,8 @@ export async function deleteAppUser(uid: string): Promise<void> {
  * Called once on app startup.
  */
 export async function bootstrapAdmin(): Promise<void> {
-  const ADMIN_EMAIL = "admin@stockmanager.com";
-  const ADMIN_PASSWORD = "Admin@123";
+  const ADMIN_EMAIL = "admin@test.com";
+  const ADMIN_PASSWORD = "test@123";
   const ADMIN_NAME = "Administrateur";
 
   try {

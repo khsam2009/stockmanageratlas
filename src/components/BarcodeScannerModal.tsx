@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { X, ScanLine, Package, Plus, Check } from "lucide-react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { X, ScanLine, Package, Plus, Check, Camera, Keyboard } from "lucide-react";
 import type { Product } from "@/lib/types";
+import { Html5Qrcode } from "html5-qrcode";
 
 interface BarcodeScannerModalProps {
   isOpen: boolean;
@@ -27,36 +28,122 @@ export default function BarcodeScannerModal({
   const [quantity, setQuantity] = useState("1");
   const [showQuantityPopup, setShowQuantityPopup] = useState(false);
   const [scannedItems, setScannedItems] = useState<ScannedItem[]>([]);
+  const [useCamera, setUseCamera] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const scannerContainerRef = useRef<HTMLDivElement>(null);
 
-  // Filter only active products
   const activeProducts = products.filter((p) => p.active !== false);
 
   useEffect(() => {
-    if (isOpen && inputRef.current) {
+    if (isOpen && inputRef.current && !useCamera) {
       inputRef.current.focus();
     }
-  }, [isOpen]);
+  }, [isOpen, useCamera]);
 
-  // Reset form when modal closes
   useEffect(() => {
     if (!isOpen) {
-      // Reset state after modal closes
       const timer = setTimeout(() => {
         setBarcode("");
         setFoundProduct(null);
         setQuantity("1");
         setShowQuantityPopup(false);
         setScannedItems([]);
+        setUseCamera(false);
+        setCameraError(null);
       }, 300);
       return () => clearTimeout(timer);
     }
   }, [isOpen]);
 
+  useEffect(() => {
+    return () => {
+      if (scannerRef.current) {
+        scannerRef.current.stop().catch(() => {});
+      }
+    };
+  }, []);
+
+  const startCamera = useCallback(async () => {
+    setCameraError(null);
+    setIsScanning(true);
+    
+    try {
+      const scanner = new Html5Qrcode("scanner-container");
+      scannerRef.current = scanner;
+      
+      await scanner.start(
+        { facingMode: "environment" },
+        {
+          fps: 10,
+          qrbox: { width: 250, height: 150 },
+          aspectRatio: 1.777778,
+        },
+        (decodedText) => {
+          handleBarcodeDetected(decodedText);
+        },
+        () => {}
+      );
+    } catch (err) {
+      console.error("Camera error:", err);
+      setCameraError("Impossible d'accéder à la caméra. Vérifiez les permissions.");
+      setIsScanning(false);
+    }
+  }, [activeProducts]);
+
+  const stopCamera = useCallback(async () => {
+    if (scannerRef.current) {
+      try {
+        await scannerRef.current.stop();
+        scannerRef.current = null;
+      } catch (err) {
+        console.error("Error stopping camera:", err);
+      }
+    }
+    setIsScanning(false);
+  }, []);
+
+  useEffect(() => {
+    if (useCamera && isOpen) {
+      startCamera();
+    } else {
+      stopCamera();
+    }
+    
+    return () => {
+      stopCamera();
+    };
+  }, [useCamera, isOpen, startCamera, stopCamera]);
+
+  const handleBarcodeDetected = (detectedBarcode: string) => {
+    const product = activeProducts.find(
+      (p) => p.code.toLowerCase() === detectedBarcode.toLowerCase()
+    );
+    
+    if (product) {
+      setFoundProduct(product);
+      setShowQuantityPopup(true);
+      stopCamera();
+      setUseCamera(false);
+    } else {
+      setBarcode(detectedBarcode);
+      const product = activeProducts.find(
+        (p) => p.code.toLowerCase() === detectedBarcode.toLowerCase()
+      );
+      if (product) {
+        setFoundProduct(product);
+        setShowQuantityPopup(true);
+        stopCamera();
+        setUseCamera(false);
+      }
+    }
+  };
+
   const handleBarcodeChange = (value: string) => {
     setBarcode(value);
     
-    // Auto-search when user stops typing or presses Enter
     if (value.length > 0) {
       const product = activeProducts.find(
         (p) => p.code.toLowerCase() === value.toLowerCase()
@@ -78,19 +165,14 @@ export default function BarcodeScannerModal({
     if (!foundProduct) return;
     const qty = parseInt(quantity) || 1;
     
-    // Add to scanned items
     setScannedItems([...scannedItems, { product: foundProduct, quantity: qty }]);
-    
-    // Notify parent
     onProductScanned(foundProduct, qty);
     
-    // Reset for next scan
     setBarcode("");
     setFoundProduct(null);
     setQuantity("1");
     setShowQuantityPopup(false);
     
-    // Refocus input
     if (inputRef.current) {
       inputRef.current.focus();
     }
@@ -148,7 +230,6 @@ export default function BarcodeScannerModal({
           </button>
         </div>
 
-        {/* Scanned items summary */}
         {scannedItems.length > 0 && (
           <div style={{ marginBottom: "16px" }}>
             <div style={{ fontSize: "13px", fontWeight: "600", marginBottom: "8px" }}>
@@ -173,66 +254,136 @@ export default function BarcodeScannerModal({
           </div>
         )}
 
-        {/* Barcode input */}
-        <div style={{ marginBottom: "16px" }}>
-          <label className="form-label">Scanner ou entrer le code-barres</label>
-          <input
-            ref={inputRef}
-            className="form-input"
-            style={{ 
-              fontSize: "18px", 
-              padding: "14px", 
-              textTransform: "uppercase",
-              letterSpacing: "2px"
-            }}
-            placeholder="Scanner le code..."
-            value={barcode}
-            onChange={(e) => handleBarcodeChange(e.target.value.toUpperCase())}
-            onKeyDown={handleKeyDown}
-            autoFocus
-          />
-        </div>
-
-        {/* Product list for manual selection */}
-        {barcode === "" && !showQuantityPopup && (
+        {useCamera && !showQuantityPopup ? (
           <div>
-            <div style={{ fontSize: "12px", color: "#64748b", marginBottom: "8px" }}>
-              Ou sélectionnez un produit :
-            </div>
-            <div style={{ maxHeight: "200px", overflow: "auto" }}>
-              {activeProducts.slice(0, 10).map((product) => (
-                <div
-                  key={product.id}
-                  onClick={() => {
-                    setFoundProduct(product);
-                    setShowQuantityPopup(true);
+            <div 
+              id="scanner-container" 
+              ref={scannerContainerRef}
+              style={{ 
+                width: "100%", 
+                minHeight: "250px",
+                background: "#000",
+                borderRadius: "12px",
+                overflow: "hidden",
+                marginBottom: "16px"
+              }} 
+            />
+            {cameraError && (
+              <div style={{ 
+                background: "#fef2f2", 
+                border: "1px solid #fecaca", 
+                borderRadius: "8px", 
+                padding: "12px",
+                textAlign: "center",
+                marginBottom: "16px",
+                color: "#dc2626"
+              }}>
+                {cameraError}
+              </div>
+            )}
+            <button
+              onClick={() => { stopCamera(); setUseCamera(false); }}
+              style={{
+                width: "100%",
+                background: "#f1f5f9",
+                border: "none",
+                borderRadius: "8px",
+                padding: "14px",
+                color: "#64748b",
+                fontSize: "14px",
+                fontWeight: "600",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "8px",
+              }}
+            >
+              <Keyboard size={18} />
+              Retour à la saisie manuelle
+            </button>
+          </div>
+        ) : (
+          <div>
+            <div style={{ marginBottom: "16px" }}>
+              <label className="form-label">Scanner ou entrer le code-barres</label>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <input
+                  ref={inputRef}
+                  className="form-input"
+                  style={{ 
+                    flex: 1,
+                    fontSize: "18px", 
+                    padding: "14px", 
+                    textTransform: "uppercase",
+                    letterSpacing: "2px"
                   }}
+                  placeholder="Scanner le code..."
+                  value={barcode}
+                  onChange={(e) => handleBarcodeChange(e.target.value.toUpperCase())}
+                  onKeyDown={handleKeyDown}
+                  autoFocus
+                />
+                <button
+                  onClick={() => setUseCamera(true)}
                   style={{
+                    background: "#1e40af",
+                    border: "none",
+                    borderRadius: "8px",
+                    padding: "14px 16px",
+                    color: "white",
+                    cursor: "pointer",
                     display: "flex",
                     alignItems: "center",
-                    gap: "10px",
-                    padding: "10px",
-                    background: "#f8fafc",
-                    borderRadius: "8px",
-                    marginBottom: "6px",
-                    cursor: "pointer",
+                    justifyContent: "center",
                   }}
+                  title="Ouvrir la caméra"
                 >
-                  <Package size={16} style={{ color: "#64748b" }} />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: "13px", fontWeight: "600" }}>{product.name}</div>
-                    <div style={{ fontSize: "11px", color: "#64748b" }}>{product.code}</div>
-                  </div>
-                  <div style={{ fontSize: "12px", color: "#64748b" }}>
-                    Stock: {product.currentStock} {product.unit}
-                  </div>
-                </div>
-              ))}
+                  <Camera size={20} />
+                </button>
+              </div>
             </div>
+
+            {barcode === "" && !showQuantityPopup && (
+              <div>
+                <div style={{ fontSize: "12px", color: "#64748b", marginBottom: "8px" }}>
+                  Ou sélectionnez un produit :
+                </div>
+                <div style={{ maxHeight: "200px", overflow: "auto" }}>
+                  {activeProducts.slice(0, 10).map((product) => (
+                    <div
+                      key={product.id}
+                      onClick={() => {
+                        setFoundProduct(product);
+                        setShowQuantityPopup(true);
+                      }}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "10px",
+                        padding: "10px",
+                        background: "#f8fafc",
+                        borderRadius: "8px",
+                        marginBottom: "6px",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <Package size={16} style={{ color: "#64748b" }} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: "13px", fontWeight: "600" }}>{product.name}</div>
+                        <div style={{ fontSize: "11px", color: "#64748b" }}>{product.code}</div>
+                      </div>
+                      <div style={{ fontSize: "12px", color: "#64748b" }}>
+                        Stock: {product.currentStock} {product.unit}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
-        {/* Quantity popup */}
         {showQuantityPopup && foundProduct && (
           <div
             style={{
@@ -320,8 +471,7 @@ export default function BarcodeScannerModal({
           </div>
         )}
 
-        {/* Product not found */}
-        {barcode.length > 0 && !foundProduct && !showQuantityPopup && (
+        {barcode.length > 0 && !foundProduct && !showQuantityPopup && !useCamera && (
           <div
             style={{
               background: "#fef2f2",
@@ -339,7 +489,6 @@ export default function BarcodeScannerModal({
           </div>
         )}
 
-        {/* Action buttons */}
         <div style={{ marginTop: "20px", display: "flex", gap: "10px" }}>
           <button
             onClick={onClose}

@@ -8,17 +8,14 @@ import { useAuth } from "@/lib/AuthContext";
 import type { Product } from "@/lib/types";
 
 const CATEGORIES = [
-  "LINGE DE LIT",
-  "LINGE DE BAIN",
-  "MATELAS 01 PLACE",
-  "MATELAS 02 PLACES",
-  "SOMMIER 01 PLACE",
-  "SOMMIER 02 PLACES",
-  "TETE DE LIT 01 PLACE",
-  "TETE DE LIT 02 PLACES",
-  "MEUBLE DE MAISON",
-  "EMBALLAGES",
-  "AUTRES",
+  "Matières premières",
+  "Consommables",
+  "Pièces détachées",
+  "Outillage",
+  "Équipements",
+  "Produits finis",
+  "Emballages",
+  "Autres",
 ];
 
 const UNITS = ["pcs", "kg", "g", "L", "mL", "m", "cm", "m²", "m³", "boîte", "carton", "palette"];
@@ -545,7 +542,7 @@ export default function ProduitsPage() {
                   className="form-input"
                   type="number"
                   min="0"
-                  placeholder="0"
+                  placeholder="∞"
                   value={form.maxStock}
                   onChange={(e) => setForm({ ...form, maxStock: e.target.value })}
                 />
@@ -576,7 +573,7 @@ export default function ProduitsPage() {
                   type="button"
                   onClick={() => setShowScanner(true)}
                   className="btn btn-secondary"
-                  style={{ padding: "8px 12px", display: "flex", alignItems: "center", gap: "4px" , width: "100px", backgroundColor: "rgb(22, 163, 74)" , color: "white"}}
+                  style={{ padding: "8px 12px", display: "flex", alignItems: "center", gap: "4px" }}
                   title="Scanner un code-barres"
                 >
                   <ScanLine size={18} />

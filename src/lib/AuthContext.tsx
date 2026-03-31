@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "./firebase";
-import { getUserProfile, bootstrapAdmin } from "./auth";
+import { getUserProfile , bootstrapAdmin } from "./auth";
 import type { AppUser, NavPage, PagePermission } from "./types";
 
 interface AuthContextValue {

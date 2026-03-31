@@ -140,7 +140,7 @@ export async function bootstrapAdmin(): Promise<void> {
     const credential = await signInWithEmailAndPassword(auth, ADMIN_EMAIL, ADMIN_PASSWORD);
     const profile = await getUserProfile(credential.user.uid);
 
-    if (!profile) {
+    /*if (!profile) {
       // Auth account exists but no Firestore profile — create it
       const allPages: PagePermission[] = [
         "dashboard",
@@ -160,13 +160,13 @@ export async function bootstrapAdmin(): Promise<void> {
         createdAt: now,
         updatedAt: now,
       });
-    }
+    }*/
 
     await signOut(auth);
   } catch {
     // Admin doesn't exist — create it
     try {
-      const credential = await createUserWithEmailAndPassword(auth, ADMIN_EMAIL, ADMIN_PASSWORD);
+      /*const credential = await createUserWithEmailAndPassword(auth, ADMIN_EMAIL, ADMIN_PASSWORD);
       await updateProfile(credential.user, { displayName: ADMIN_NAME });
 
       const allPages: PagePermission[] = [
@@ -186,7 +186,7 @@ export async function bootstrapAdmin(): Promise<void> {
         active: true,
         createdAt: now,
         updatedAt: now,
-      });
+      });*/
 
       await signOut(auth);
     } catch {

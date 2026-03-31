@@ -573,7 +573,7 @@ export default function ProduitsPage() {
                   type="button"
                   onClick={() => setShowScanner(true)}
                   className="btn btn-secondary"
-                  style={{ padding: "8px 12px", display: "flex", alignItems: "center", gap: "4px" }}
+                  style={{ padding: "8px 12px", display: "flex", alignItems: "center", gap: "4px" , width: "80px"}}
                   title="Scanner un code-barres"
                 >
                   <ScanLine size={18} />

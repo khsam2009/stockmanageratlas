@@ -49,7 +49,7 @@ export async function getProducts(lastDoc?: { name: string }): Promise<{ product
   };
 }
 
-export async function addProduct(product: Omit<Product, "id">): Promise<string> {
+export async function addProduct(product: Omit<Product, "id"> ): Promise<string> {
   const docRef = await addDoc(productsCollection, {
     ...product,
     createdAt: Timestamp.now(),

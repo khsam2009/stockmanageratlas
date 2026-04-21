@@ -39,7 +39,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .catch(() => {
         // Ignore bootstrap errors (e.g., no network)
       })
-      .finally(() => setBootstrapped(true));
+      .finally(() => setBootstrapped(true));/* */
   }, []);
 
   const refreshUser = useCallback(async () => {

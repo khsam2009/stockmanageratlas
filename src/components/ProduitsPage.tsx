@@ -8,14 +8,17 @@ import { useAuth } from "@/lib/AuthContext";
 import type { Product } from "@/lib/types";
 
 const CATEGORIES = [
-  "Matières premières",
-  "Consommables",
-  "Pièces détachées",
-  "Outillage",
-  "Équipements",
-  "Produits finis",
-  "Emballages",
-  "Autres",
+  "LINGE DE LIT",
+  "LINGE DE BAIN",
+  "MATELAS 01 PLACE",
+  "MATELAS 02 PLACES",
+  "SOMMIER 01 PLACE",
+  "SOMMIER 02 PLACES",
+  "TETE DE LIT 01 PLACE",
+  "TETE DE LIT 02 PLACES",
+  "MEUBLE DE MAISON",
+  "EMBALLAGES",
+  "AUTRES",
 ];
 
 const UNITS = ["pcs", "kg", "g", "L", "mL", "m", "cm", "m²", "m³", "boîte", "carton", "palette"];
@@ -140,22 +143,21 @@ export default function ProduitsPage() {
         unit: form.unit,
         currentStock: parseInt(form.currentStock) || 0,
         minStock: parseInt(form.minStock) || 0,
-        maxStock: form.maxStock ? parseInt(form.maxStock) : undefined,
+        maxStock: form.maxStock ? parseInt(form.maxStock) : 0,
         location: form.location,
-        codebarreEAN13: form.codebarreEAN13 || undefined,
+        codebarreEAN13: form.codebarreEAN13 || '0',
         active: form.active,
         minStockAlarm: form.minStockAlarm,
       };
 
       if (editProduct) {
-        await updateProduct(editProduct.id, productData, appUser?.email);
+        await updateProduct(editProduct.id, productData,  appUser?.email);
       } else {
         await addProduct({
           ...productData,
           createdAt: new Date(),
           updatedAt: new Date(),
-          createdByEmail: appUser?.email,
-          updatedByEmail: appUser?.email,
+          createdByEmail: appUser?.email
         });
       }
 
@@ -542,7 +544,7 @@ export default function ProduitsPage() {
                   className="form-input"
                   type="number"
                   min="0"
-                  placeholder="∞"
+                  placeholder="0"
                   value={form.maxStock}
                   onChange={(e) => setForm({ ...form, maxStock: e.target.value })}
                 />

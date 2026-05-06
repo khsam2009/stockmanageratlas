@@ -45,14 +45,14 @@ body {
   left: 50%;
   transform: translateX(-50%);
   width: 100%;
-  max-width: 490px;
+  max-width: 480px;
   background: white;
   border-top: 1px solid var(--border);
   display: flex;
   justify-content: space-around;
   padding: 8px 0 12px;
   z-index: 100;
-  box-shadow: 0 -4px 12px rgba(2, 2, 2, 0.205);
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
 }
 
 .nav-item {

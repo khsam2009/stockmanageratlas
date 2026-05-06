@@ -14,6 +14,7 @@ export default function OperateursPage() {
   const [editOperator, setEditOperator] = useState<Operator | null>(null);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
+  const hasWriteAccess = appUser ? appUser.role === "admin" || appUser.permissions.operateurs === "write" : false;
 
   const [form, setForm] = useState({
     name: "",
@@ -42,6 +43,10 @@ export default function OperateursPage() {
   }, []);
 
   const openCreate = () => {
+    if (!hasWriteAccess) {
+      alert("Vous n'avez pas les droits pour creer un operateur.");
+      return;
+    }
     setEditOperator(null);
     setForm({
       name: "",
@@ -110,6 +115,10 @@ export default function OperateursPage() {
       alert("Erreur lors de l'enregistrement");
     } finally {
       setSaving(false);
+    if (!hasWriteAccess) {
+      alert("Vous n'avez pas les droits pour supprimer un operateur.");
+      return;
+    }
     }
   };
 
@@ -334,9 +343,11 @@ export default function OperateursPage() {
       </div>
 
       {/* FAB */}
-      <button className="fab" onClick={openCreate}>
-        <Plus size={24} />
-      </button>
+      {hasWriteAccess && (
+        <button className="fab" onClick={openCreate}>
+          <Plus size={24} />
+        </button>
+      )}
 
       {/* Modal */}
       {showModal && (

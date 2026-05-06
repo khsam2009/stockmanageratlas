@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { getAllUsers, createAppUser, updateAppUser, deleteAppUser } from "@/lib/auth";
 import { useAuth } from "@/lib/AuthContext";
-import type { AppUser, CreateUserData, PagePermission } from "@/lib/types";
+import type { AppUser, CreateUserData, PagePermission, UserPermissions, PermissionLevel } from "@/lib/types";
 
 const ALL_PERMISSIONS: { id: PagePermission; label: string }[] = [
   { id: "dashboard", label: "Tableau de bord" },
@@ -27,9 +27,22 @@ const ALL_PERMISSIONS: { id: PagePermission; label: string }[] = [
   { id: "sortie", label: "Bon de sortie" },
   { id: "inventaire", label: "Inventaire" },
   { id: "produits", label: "Produits" },
+  { id: "fournisseurs", label: "Fournisseurs" },
+  { id: "operateurs", label: "Operateurs" },
 ];
 
-// ==================== CREATE USER MODAL ====================
+function getDefaultPermissions(): UserPermissions {
+  return {
+    dashboard: "none",
+    mouvements: "none",
+    reception: "none",
+    sortie: "none",
+    inventaire: "none",
+    produits: "none",
+    fournisseurs: "none",
+    operateurs: "none",
+  };
+}
 
 interface CreateUserModalProps {
   onClose: () => void;
@@ -37,23 +50,23 @@ interface CreateUserModalProps {
 }
 
 function CreateUserModal({ onClose, onCreated }: CreateUserModalProps) {
-  const [form, setForm] = useState<CreateUserData>({
+  const [form, setForm] = useState<Omit<CreateUserData, "permissions"> & { permissions?: UserPermissions }>({
     email: "",
     password: "",
     displayName: "",
     role: "user",
-    permissions: ["dashboard"],
   });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const togglePermission = (perm: PagePermission) => {
+  const setPermission = (perm: PagePermission, level: PermissionLevel) => {
     setForm((prev) => ({
       ...prev,
-      permissions: prev.permissions.includes(perm)
-        ? prev.permissions.filter((p) => p !== perm)
-        : [...prev.permissions, perm],
+      permissions: {
+        ...(prev.permissions || getDefaultPermissions()),
+        [perm]: level,
+      },
     }));
   };
 
@@ -66,19 +79,25 @@ function CreateUserModal({ onClose, onCreated }: CreateUserModalProps) {
       return;
     }
     if (form.password.length < 6) {
-      setError("Le mot de passe doit contenir au moins 6 caractères.");
+      setError("Le mot de passe doit contenir au moins 6 caracteres.");
       return;
     }
 
     setLoading(true);
     try {
-      await createAppUser(form);
+      await createAppUser({
+        email: form.email,
+        password: form.password,
+        displayName: form.displayName,
+        role: form.role,
+        permissions: form.permissions || getDefaultPermissions(),
+      } as CreateUserData);
       onCreated();
       onClose();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Erreur lors de la création.";
+      const msg = err instanceof Error ? err.message : "Erreur lors de la creation.";
       if (msg.includes("auth/email-already-in-use")) {
-        setError("Cet email est déjà utilisé.");
+        setError("Cet email est deja utilise.");
       } else {
         setError(msg);
       }
@@ -121,7 +140,7 @@ function CreateUserModal({ onClose, onCreated }: CreateUserModalProps) {
           }}
         >
           <h3 style={{ fontSize: "18px", fontWeight: "700", color: "#1e293b", margin: 0 }}>
-            Créer un utilisateur
+            Creer un utilisateur
           </h3>
           <button
             onClick={onClose}
@@ -139,7 +158,6 @@ function CreateUserModal({ onClose, onCreated }: CreateUserModalProps) {
         </div>
 
         <form onSubmit={handleSubmit}>
-          {/* Name */}
           <div style={{ marginBottom: "14px" }}>
             <label style={labelStyle}>Nom complet</label>
             <input
@@ -151,7 +169,6 @@ function CreateUserModal({ onClose, onCreated }: CreateUserModalProps) {
             />
           </div>
 
-          {/* Email */}
           <div style={{ marginBottom: "14px" }}>
             <label style={labelStyle}>Email</label>
             <input
@@ -163,7 +180,6 @@ function CreateUserModal({ onClose, onCreated }: CreateUserModalProps) {
             />
           </div>
 
-          {/* Password */}
           <div style={{ marginBottom: "14px" }}>
             <label style={labelStyle}>Mot de passe</label>
             <div style={{ position: "relative" }}>
@@ -171,7 +187,7 @@ function CreateUserModal({ onClose, onCreated }: CreateUserModalProps) {
                 type={showPassword ? "text" : "password"}
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
-                placeholder="Min. 6 caractères"
+                placeholder="Min. 6 caracteres"
                 style={{ ...inputStyle, paddingRight: "44px" }}
               />
               <button
@@ -194,14 +210,11 @@ function CreateUserModal({ onClose, onCreated }: CreateUserModalProps) {
             </div>
           </div>
 
-          {/* Role */}
           <div style={{ marginBottom: "14px" }}>
-            <label style={labelStyle}>Rôle</label>
+            <label style={labelStyle}>Role</label>
             <select
               value={form.role}
-              onChange={(e) =>
-                setForm({ ...form, role: e.target.value as "admin" | "user" })
-              }
+              onChange={(e) => setForm({ ...form, role: e.target.value as "admin" | "user" })}
               style={inputStyle}
             >
               <option value="user">Utilisateur</option>
@@ -209,46 +222,93 @@ function CreateUserModal({ onClose, onCreated }: CreateUserModalProps) {
             </select>
           </div>
 
-          {/* Permissions (only for non-admin) */}
           {form.role === "user" && (
             <div style={{ marginBottom: "20px" }}>
-              <label style={labelStyle}>Accès aux pages</label>
+              <label style={labelStyle}>Acces aux pages</label>
               <div
                 style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
+                  display: "flex",
+                  flexDirection: "column" as const,
                   gap: "8px",
                   marginTop: "6px",
                 }}
               >
-                {ALL_PERMISSIONS.map((perm) => (
-                  <button
-                    key={perm.id}
-                    type="button"
-                    onClick={() => togglePermission(perm.id)}
-                    style={{
-                      padding: "8px 12px",
-                      borderRadius: "8px",
-                      border: "1.5px solid",
-                      borderColor: form.permissions.includes(perm.id) ? "#2563eb" : "#e2e8f0",
-                      background: form.permissions.includes(perm.id) ? "#eff6ff" : "white",
-                      color: form.permissions.includes(perm.id) ? "#2563eb" : "#64748b",
-                      fontSize: "13px",
-                      fontWeight: "500",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                    }}
-                  >
-                    {form.permissions.includes(perm.id) ? (
-                      <Check size={14} />
-                    ) : (
-                      <div style={{ width: 14 }} />
-                    )}
-                    {perm.label}
-                  </button>
-                ))}
+                {ALL_PERMISSIONS.map((perm) => {
+                  const perms = form.permissions || getDefaultPermissions();
+                  return (
+                    <div
+                      key={perm.id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: "10px 12px",
+                        background: "#f8fafc",
+                        borderRadius: "8px",
+                        border: "1px solid #e2e8f0",
+                      }}
+                    >
+                      <span style={{ fontSize: "13px", fontWeight: "500", color: "#475569" }}>
+                        {perm.label}
+                      </span>
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: "4px",
+                        }}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setPermission(perm.id, "none")}
+                          style={{
+                            padding: "4px 10px",
+                            borderRadius: "6px",
+                            border: perms[perm.id] === "none" ? "1.5px solid #94a3b8" : "1.5px solid #e2e8f0",
+                            background: perms[perm.id] === "none" ? "#e2e8f0" : "white",
+                            color: perms[perm.id] === "none" ? "#475569" : "#94a3b8",
+                            fontSize: "11px",
+                            fontWeight: "600",
+                            cursor: "pointer",
+                          }}
+                        >
+                          Aucun
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPermission(perm.id, "read")}
+                          style={{
+                            padding: "4px 10px",
+                            borderRadius: "6px",
+                            border: perms[perm.id] === "read" ? "1.5px solid #3b82f6" : "1.5px solid #e2e8f0",
+                            background: perms[perm.id] === "read" ? "#eff6ff" : "white",
+                            color: perms[perm.id] === "read" ? "#2563eb" : "#94a3b8",
+                            fontSize: "11px",
+                            fontWeight: "600",
+                            cursor: "pointer",
+                          }}
+                        >
+                          Lecture
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPermission(perm.id, "write")}
+                          style={{
+                            padding: "4px 10px",
+                            borderRadius: "6px",
+                            border: perms[perm.id] === "write" ? "1.5px solid #16a34a" : "1.5px solid #e2e8f0",
+                            background: perms[perm.id] === "write" ? "#ecfdf5" : "white",
+                            color: perms[perm.id] === "write" ? "#16a34a" : "#94a3b8",
+                            fontSize: "11px",
+                            fontWeight: "600",
+                            cursor: "pointer",
+                          }}
+                        >
+                          Ecriture
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -265,7 +325,7 @@ function CreateUserModal({ onClose, onCreated }: CreateUserModalProps) {
                 color: "#92400e",
               }}
             >
-              Les administrateurs ont accès à toutes les pages.
+              Les administrateurs ont acces a toutes les pages.
             </div>
           )}
 
@@ -302,17 +362,19 @@ function CreateUserModal({ onClose, onCreated }: CreateUserModalProps) {
               fontSize: "15px",
               fontWeight: "600",
               cursor: loading ? "not-allowed" : "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "8px",
             }}
           >
-            {loading ? "Création..." : "Créer le compte"}
+            {loading ? "Creation..." : "Creer le compte"}
           </button>
         </form>
       </div>
     </div>
   );
 }
-
-// ==================== EDIT USER MODAL ====================
 
 interface EditUserModalProps {
   user: AppUser;
@@ -323,14 +385,15 @@ interface EditUserModalProps {
 function EditUserModal({ user, onClose, onUpdated }: EditUserModalProps) {
   const [displayName, setDisplayName] = useState(user.displayName);
   const [role, setRole] = useState<"admin" | "user">(user.role);
-  const [permissions, setPermissions] = useState<PagePermission[]>(user.permissions);
+  const [permissions, setPermissions] = useState<UserPermissions>(user.permissions);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const togglePermission = (perm: PagePermission) => {
-    setPermissions((prev) =>
-      prev.includes(perm) ? prev.filter((p) => p !== perm) : [...prev, perm]
-    );
+  const setPermission = (perm: PagePermission, level: PermissionLevel) => {
+    setPermissions((prev) => ({
+      ...prev,
+      [perm]: level,
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -342,7 +405,7 @@ function EditUserModal({ user, onClose, onUpdated }: EditUserModalProps) {
       onUpdated();
       onClose();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Erreur lors de la mise à jour.");
+      setError(err instanceof Error ? err.message : "Erreur lors de la mise a jour.");
     } finally {
       setLoading(false);
     }
@@ -412,11 +475,16 @@ function EditUserModal({ user, onClose, onUpdated }: EditUserModalProps) {
 
           <div style={{ marginBottom: "14px" }}>
             <label style={labelStyle}>Email (non modifiable)</label>
-            <input type="email" value={user.email} disabled style={{ ...inputStyle, background: "#f8fafc", color: "#94a3b8" }} />
+            <input
+              type="email"
+              value={user.email}
+              disabled
+              style={{ ...inputStyle, background: "#f8fafc", color: "#94a3b8" }}
+            />
           </div>
 
           <div style={{ marginBottom: "14px" }}>
-            <label style={labelStyle}>Rôle</label>
+            <label style={labelStyle}>Role</label>
             <select
               value={role}
               onChange={(e) => setRole(e.target.value as "admin" | "user")}
@@ -429,38 +497,87 @@ function EditUserModal({ user, onClose, onUpdated }: EditUserModalProps) {
 
           {role === "user" && (
             <div style={{ marginBottom: "20px" }}>
-              <label style={labelStyle}>Accès aux pages</label>
+              <label style={labelStyle}>Acces aux pages</label>
               <div
                 style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
+                  display: "flex",
+                  flexDirection: "column" as const,
                   gap: "8px",
                   marginTop: "6px",
                 }}
               >
                 {ALL_PERMISSIONS.map((perm) => (
-                  <button
+                  <div
                     key={perm.id}
-                    type="button"
-                    onClick={() => togglePermission(perm.id)}
                     style={{
-                      padding: "8px 12px",
-                      borderRadius: "8px",
-                      border: "1.5px solid",
-                      borderColor: permissions.includes(perm.id) ? "#2563eb" : "#e2e8f0",
-                      background: permissions.includes(perm.id) ? "#eff6ff" : "white",
-                      color: permissions.includes(perm.id) ? "#2563eb" : "#64748b",
-                      fontSize: "13px",
-                      fontWeight: "500",
-                      cursor: "pointer",
                       display: "flex",
                       alignItems: "center",
-                      gap: "6px",
+                      justifyContent: "space-between",
+                      padding: "10px 12px",
+                      background: "#f8fafc",
+                      borderRadius: "8px",
+                      border: "1px solid #e2e8f0",
                     }}
                   >
-                    {permissions.includes(perm.id) ? <Check size={14} /> : <div style={{ width: 14 }} />}
-                    {perm.label}
-                  </button>
+                    <span style={{ fontSize: "13px", fontWeight: "500", color: "#475569" }}>
+                      {perm.label}
+                    </span>
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: "4px",
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setPermission(perm.id, "none")}
+                        style={{
+                          padding: "4px 10px",
+                          borderRadius: "6px",
+                          border: permissions[perm.id] === "none" ? "1.5px solid #94a3b8" : "1.5px solid #e2e8f0",
+                          background: permissions[perm.id] === "none" ? "#e2e8f0" : "white",
+                          color: permissions[perm.id] === "none" ? "#475569" : "#94a3b8",
+                          fontSize: "11px",
+                          fontWeight: "600",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Aucun
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPermission(perm.id, "read")}
+                        style={{
+                          padding: "4px 10px",
+                          borderRadius: "6px",
+                          border: permissions[perm.id] === "read" ? "1.5px solid #3b82f6" : "1.5px solid #e2e8f0",
+                          background: permissions[perm.id] === "read" ? "#eff6ff" : "white",
+                          color: permissions[perm.id] === "read" ? "#2563eb" : "#94a3b8",
+                          fontSize: "11px",
+                          fontWeight: "600",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Lecture
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPermission(perm.id, "write")}
+                        style={{
+                          padding: "4px 10px",
+                          borderRadius: "6px",
+                          border: permissions[perm.id] === "write" ? "1.5px solid #16a34a" : "1.5px solid #e2e8f0",
+                          background: permissions[perm.id] === "write" ? "#ecfdf5" : "white",
+                          color: permissions[perm.id] === "write" ? "#16a34a" : "#94a3b8",
+                          fontSize: "11px",
+                          fontWeight: "600",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Ecriture
+                      </button>
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>
@@ -509,8 +626,6 @@ function EditUserModal({ user, onClose, onUpdated }: EditUserModalProps) {
   );
 }
 
-// ==================== MAIN ADMIN PAGE ====================
-
 export default function AdminPage() {
   const { appUser } = useAuth();
   const [users, setUsers] = useState<AppUser[]>([]);
@@ -555,9 +670,30 @@ export default function AdminPage() {
     }
   };
 
+  const getPermissionBadgeLabel = (level: PermissionLevel): string => {
+    switch (level) {
+      case "none":
+        return "✗ Aucun";
+      case "read":
+        return "✓ Lecture";
+      case "write":
+        return "✎ Ecriture";
+    }
+  };
+
+  const getPermissionBadgeStyle = (level: PermissionLevel) => {
+    switch (level) {
+      case "none":
+        return { background: "#f1f5f9", color: "#94a3b8", borderColor: "#e2e8f0" };
+      case "read":
+        return { background: "#eff6ff", color: "#2563eb", borderColor: "#bfdbfe" };
+      case "write":
+        return { background: "#ecfdf5", color: "#16a34a", borderColor: "#bbf7d0" };
+    }
+  };
+
   return (
     <div style={{ padding: "16px", maxWidth: "600px", margin: "0 auto" }}>
-      {/* Header */}
       <div
         style={{
           display: "flex",
@@ -595,7 +731,6 @@ export default function AdminPage() {
         </button>
       </div>
 
-      {/* Stats */}
       <div
         style={{
           display: "grid",
@@ -612,9 +747,7 @@ export default function AdminPage() {
             textAlign: "center",
           }}
         >
-          <div style={{ fontSize: "24px", fontWeight: "700", color: "#2563eb" }}>
-            {users.length}
-          </div>
+          <div style={{ fontSize: "24px", fontWeight: "700", color: "#2563eb" }}>{users.length}</div>
           <div style={{ fontSize: "12px", color: "#64748b" }}>Total utilisateurs</div>
         </div>
         <div
@@ -632,11 +765,8 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* User List */}
       {loading ? (
-        <div style={{ textAlign: "center", padding: "40px", color: "#94a3b8" }}>
-          Chargement...
-        </div>
+        <div style={{ textAlign: "center", padding: "40px", color: "#94a3b8" }}>Chargement...</div>
       ) : users.length === 0 ? (
         <div
           style={{
@@ -663,7 +793,6 @@ export default function AdminPage() {
                 opacity: user.active ? 1 : 0.6,
               }}
             >
-              {/* User Row */}
               <div
                 style={{
                   display: "flex",
@@ -672,7 +801,6 @@ export default function AdminPage() {
                   gap: "12px",
                 }}
               >
-                {/* Avatar */}
                 <div
                   style={{
                     width: "42px",
@@ -691,7 +819,6 @@ export default function AdminPage() {
                   {user.displayName.charAt(0).toUpperCase()}
                 </div>
 
-                {/* Info */}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div
                     style={{
@@ -754,12 +881,11 @@ export default function AdminPage() {
                         fontWeight: "600",
                       }}
                     >
-                      {user.active ? "Actif" : "Désactivé"}
+                      {user.active ? "Actif" : "Desactive"}
                     </span>
                   </div>
                 </div>
 
-                {/* Actions */}
                 <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
                   <button
                     onClick={() => setExpandedUser(expandedUser === user.uid ? null : user.uid)}
@@ -785,7 +911,7 @@ export default function AdminPage() {
                         onClick={() => handleToggleActive(user)}
                         disabled={actionLoading === user.uid}
                         style={iconBtnStyle}
-                        title={user.active ? "Désactiver" : "Activer"}
+                        title={user.active ? "Desactiver" : "Activer"}
                       >
                         {user.active ? (
                           <ShieldOff size={16} color="#f59e0b" />
@@ -806,7 +932,6 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              {/* Expanded Permissions */}
               {expandedUser === user.uid && (
                 <div
                   style={{
@@ -816,31 +941,34 @@ export default function AdminPage() {
                   }}
                 >
                   <p style={{ fontSize: "12px", fontWeight: "600", color: "#64748b", margin: "0 0 8px" }}>
-                    Accès aux pages :
+                    Acces aux pages :
                   </p>
                   {user.role === "admin" ? (
                     <span style={{ fontSize: "12px", color: "#d97706", fontWeight: "600" }}>
                       Toutes les pages (administrateur)
                     </span>
                   ) : (
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                      {ALL_PERMISSIONS.map((perm) => (
-                        <span
-                          key={perm.id}
-                          style={{
-                            fontSize: "11px",
-                            padding: "3px 8px",
-                            borderRadius: "6px",
-                            background: user.permissions.includes(perm.id) ? "#eff6ff" : "#f1f5f9",
-                            color: user.permissions.includes(perm.id) ? "#2563eb" : "#94a3b8",
-                            fontWeight: "500",
-                            border: `1px solid ${user.permissions.includes(perm.id) ? "#bfdbfe" : "#e2e8f0"}`,
-                          }}
-                        >
-                          {user.permissions.includes(perm.id) ? "✓ " : "✗ "}
-                          {perm.label}
-                        </span>
-                      ))}
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                      {ALL_PERMISSIONS.map((perm) => {
+                        const level = user.permissions[perm.id];
+                        const style = getPermissionBadgeStyle(level);
+                        return (
+                          <span
+                            key={perm.id}
+                            style={{
+                              fontSize: "11px",
+                              padding: "4px 10px",
+                              borderRadius: "6px",
+                              fontWeight: "600",
+                              border: `1px solid ${style.borderColor}`,
+                              background: style.background,
+                              color: style.color,
+                            }}
+                          >
+                            {perm.label}: {getPermissionBadgeLabel(level)}
+                          </span>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -850,7 +978,6 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* Modals */}
       {showCreateModal && (
         <CreateUserModal
           onClose={() => setShowCreateModal(false)}
@@ -867,8 +994,6 @@ export default function AdminPage() {
     </div>
   );
 }
-
-// ==================== STYLES ====================
 
 const labelStyle: React.CSSProperties = {
   display: "block",

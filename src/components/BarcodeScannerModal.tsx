@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { X, ScanLine, Package, Plus, Check, Camera, Keyboard } from "lucide-react";
+import { X, ScanLine, Package, Check, Camera, Keyboard } from "lucide-react";
 import type { Product } from "@/lib/types";
 import { Html5Qrcode } from "html5-qrcode";
 
@@ -30,7 +30,6 @@ export default function BarcodeScannerModal({
   const [scannedItems, setScannedItems] = useState<ScannedItem[]>([]);
   const [useCamera, setUseCamera] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
-  const [isScanning, setIsScanning] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const scannerContainerRef = useRef<HTMLDivElement>(null);
@@ -66,10 +65,36 @@ export default function BarcodeScannerModal({
     };
   }, []);
 
-  const startCamera = useCallback(async () => {
-    setCameraError(null);
-    setIsScanning(true);
+  const stopCamera = useCallback(async () => {
+    if (scannerRef.current) {
+      try {
+        await scannerRef.current.stop();
+        scannerRef.current = null;
+      } catch (err) {
+        console.error("Error stopping camera:", err);
+      }
+    }
+  }, []);
+
+  const handleBarcodeDetected = useCallback((detectedBarcode: string) => {
+    const product = activeProducts.find(
+      (p) => p.code.toLowerCase() === detectedBarcode.toLowerCase()
+    );
     
+    if (product) {
+      setFoundProduct(product);
+      setShowQuantityPopup(true);
+      if (scannerRef.current) {
+        scannerRef.current.stop().catch(() => {});
+        scannerRef.current = null;
+      }
+      setUseCamera(false);
+    } else {
+      setBarcode(detectedBarcode);
+    }
+  }, [activeProducts]);
+
+  const startCamera = useCallback(async () => {
     try {
       const scanner = new Html5Qrcode("scanner-container");
       scannerRef.current = scanner;
@@ -86,28 +111,20 @@ export default function BarcodeScannerModal({
         },
         () => {}
       );
+      return true;
     } catch (err) {
       console.error("Camera error:", err);
-      setCameraError("Impossible d'accéder à la caméra. Vérifiez les permissions.");
-      setIsScanning(false);
+      return false;
     }
-  }, [activeProducts]);
-
-  const stopCamera = useCallback(async () => {
-    if (scannerRef.current) {
-      try {
-        await scannerRef.current.stop();
-        scannerRef.current = null;
-      } catch (err) {
-        console.error("Error stopping camera:", err);
-      }
-    }
-    setIsScanning(false);
-  }, []);
+  }, [handleBarcodeDetected]);
 
   useEffect(() => {
     if (useCamera && isOpen) {
-      startCamera();
+      startCamera().then((success) => {
+        if (!success) {
+          setCameraError("Impossible d'accéder à la caméra. Vérifiez les permissions.");
+        }
+      });
     } else {
       stopCamera();
     }
@@ -116,30 +133,6 @@ export default function BarcodeScannerModal({
       stopCamera();
     };
   }, [useCamera, isOpen, startCamera, stopCamera]);
-
-  const handleBarcodeDetected = (detectedBarcode: string) => {
-    const product = activeProducts.find(
-      (p) => p.code.toLowerCase() === detectedBarcode.toLowerCase()
-    );
-    
-    if (product) {
-      setFoundProduct(product);
-      setShowQuantityPopup(true);
-      stopCamera();
-      setUseCamera(false);
-    } else {
-      setBarcode(detectedBarcode);
-      const product = activeProducts.find(
-        (p) => p.code.toLowerCase() === detectedBarcode.toLowerCase()
-      );
-      if (product) {
-        setFoundProduct(product);
-        setShowQuantityPopup(true);
-        stopCamera();
-        setUseCamera(false);
-      }
-    }
-  };
 
   const handleBarcodeChange = (value: string) => {
     setBarcode(value);

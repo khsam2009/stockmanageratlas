@@ -24,6 +24,7 @@ export default function MouvementsPage() {
   const [filter, setFilter] = useState<"all" | "entree" | "sortie">("all");
   const [search, setSearch] = useState("");
   const [saving, setSaving] = useState(false);
+  const hasWriteAccess = appUser ? appUser.role === "admin" || appUser.permissions.mouvements === "write" : false;
   const [showScanner, setShowScanner] = useState(false);
 
   const [form, setForm] = useState({
@@ -291,9 +292,11 @@ export default function MouvementsPage() {
       </div>
 
       {/* FAB */}
-      <button className="fab" onClick={() => setShowModal(true)}>
-        <Plus size={24} />
-      </button>
+      {hasWriteAccess && (
+        <button className="fab" onClick={() => setShowModal(true)}>
+          <Plus size={24} />
+        </button>
+      )}
 
       {/* Barcode Scanner Modal */}
       <BarcodeScannerModal

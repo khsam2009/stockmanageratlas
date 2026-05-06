@@ -20,7 +20,7 @@ import {
   orderBy,
 } from "firebase/firestore";
 import { auth, db } from "./firebase";
-import type { AppUser, CreateUserData, PagePermission } from "./types";
+import type { AppUser, CreateUserData, PagePermission, UserPermissions, PermissionLevel } from "./types";
 
 // ==================== USER PROFILE IN FIRESTORE ====================
 
@@ -83,7 +83,7 @@ export async function createAppUser(data: CreateUserData): Promise<AppUser> {
     email: data.email,
     displayName: data.displayName,
     role: data.role,
-    permissions: data.permissions,
+    permissions: data.permissions || { dashboard: "none", mouvements: "none", reception: "none", sortie: "none", inventaire: "none", produits: "none", fournisseurs: "none", operateurs: "none" },
     active: true,
     createdAt: now.toDate(),
     updatedAt: now.toDate(),
@@ -131,63 +131,67 @@ export async function deleteAppUser(uid: string): Promise<void> {
  * Called once on app startup.
  */
 export async function bootstrapAdmin(): Promise<void> {
-  const ADMIN_EMAIL = "****@stockmanager.com";
-  const ADMIN_PASSWORD = "*****";
-  const ADMIN_NAME = "Admin";
+  const ADMIN_EMAIL = "admin@stockmanager.com";
+  const ADMIN_PASSWORD = "Admin@123";
+  const ADMIN_NAME = "Administrateur";
 
   try {
     // Try to sign in — if it works, admin already exists
     const credential = await signInWithEmailAndPassword(auth, ADMIN_EMAIL, ADMIN_PASSWORD);
     const profile = await getUserProfile(credential.user.uid);
 
-   /* if (!profile) {
+    if (!profile) {
       // Auth account exists but no Firestore profile — create it
-      const allPages: PagePermission[] = [
-        "dashboard",
-        "mouvements",
-        "reception",
-        "sortie",
-        "inventaire",
-        "produits",
-      ];
+      const adminPerms = {
+        dashboard: "write",
+        mouvements: "write",
+        reception: "write",
+        sortie: "write",
+        inventaire: "write",
+        produits: "write",
+        fournisseurs: "write",
+        operateurs: "write",
+      };
       const now = Timestamp.now();
       await setDoc(doc(db, "users", credential.user.uid), {
         email: ADMIN_EMAIL,
         displayName: ADMIN_NAME,
         role: "admin",
-        permissions: allPages,
+        permissions: adminPerms,
         active: true,
         createdAt: now,
         updatedAt: now,
       });
-    }*/
+    }
 
     await signOut(auth);
   } catch {
     // Admin doesn't exist — create it
-  try {
-  /*      const credential = await createUserWithEmailAndPassword(auth, ADMIN_EMAIL, ADMIN_PASSWORD);
+    try {
+      const credential = await createUserWithEmailAndPassword(auth, ADMIN_EMAIL, ADMIN_PASSWORD);
       await updateProfile(credential.user, { displayName: ADMIN_NAME });
 
-      const allPages: PagePermission[] = [
-        "dashboard",
-        "mouvements",
-        "reception",
-        "sortie",
-        "inventaire",
-        "produits",
-      ];
+      const adminPerms = {
+        dashboard: "write",
+        mouvements: "write",
+        reception: "write",
+        sortie: "write",
+        inventaire: "write",
+        produits: "write",
+        fournisseurs: "write",
+        operateurs: "write",
+      };
       const now = Timestamp.now();
       await setDoc(doc(db, "users", credential.user.uid), {
         email: ADMIN_EMAIL,
         displayName: ADMIN_NAME,
         role: "admin",
-        permissions: allPages,
+        permissions: adminPerms,
         active: true,
         createdAt: now,
         updatedAt: now,
       });
-*/
+
       await signOut(auth);
     } catch {
       // Admin creation failed (e.g., already exists in Auth but wrong password) — ignore

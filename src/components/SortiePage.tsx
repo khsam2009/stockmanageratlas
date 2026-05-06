@@ -18,6 +18,7 @@ export default function SortiePage() {
   const { appUser } = useAuth();
   const [sorties, setSorties] = useState<BonSortie[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const hasWriteAccess = appUser ? appUser.role === "admin" || appUser.permissions.sortie === "write" : false;
   const [operators, setOperators] = useState<Operator[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -268,9 +269,11 @@ export default function SortiePage() {
       </div>
 
       {/* FAB */}
-      <button className="fab" onClick={() => setShowModal(true)}>
-        <Plus size={24} />
-      </button>
+      {hasWriteAccess && (
+        <button className="fab" onClick={() => setShowModal(true)}>
+          <Plus size={24} />
+        </button>
+      )}
 
       {/* Barcode Scanner Modal */}
       <BarcodeScannerModal

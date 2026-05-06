@@ -1,48 +1,38 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Plus, X, Search, Edit2, Trash2, Package, AlertTriangle, Loader2, ScanLine } from "lucide-react";
-import BarcodeScannerModal from "@/components/BarcodeScannerModal";
-import { getProducts, addProduct, updateProduct, deleteProduct } from "@/lib/firestore";
+import { Plus, X, Search, Edit2, Trash2, Package, AlertTriangle, Loader2, ScanLine, Menu } from "lucide-react";
+import ProductBarcodeScanner from "@/components/ProductBarcodeScanner";
+import { getProducts, addProduct, updateProduct, deleteProduct, getCategories, addCategory } from "@/lib/firestore";
+import type { Categorie } from "@/lib/types";
 import { useAuth } from "@/lib/AuthContext";
 import type { Product } from "@/lib/types";
-
-const CATEGORIES = [
-  "LINGE DE LIT",
-  "LINGE DE BAIN",
-  "MATELAS 01 PLACE",
-  "MATELAS 02 PLACES",
-  "SOMMIER 01 PLACE",
-  "SOMMIER 02 PLACES",
-  "TETE DE LIT 01 PLACE",
-  "TETE DE LIT 02 PLACES",
-  "MEUBLE DE MAISON",
-  "EMBALLAGES",
-  "AUTRES",
-];
 
 const UNITS = ["pcs", "kg", "g", "L", "mL", "m", "cm", "m²", "m³", "boîte", "carton", "palette"];
 
 export default function ProduitsPage() {
   const { appUser } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<string[]>([]); // Categories as strings
   const [loading, setLoading] = useState(true);
+  const [loadingCategories, setLoadingCategories] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [lastDoc, setLastDoc] = useState<{ name: string } | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
+  const [showOperatorMenu, setShowOperatorMenu] = useState(false);
+  const [showCategoriesMenu, setShowCategoriesMenu] = useState(false);
+  const [showAdminMenu, setShowAdminMenu] = useState(false);
+  const hasWriteAccess = appUser ? appUser.role === "admin" || appUser.permissions.produits === "write" : false;
   const [editProduct, setEditProduct] = useState<Product | null>(null);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
   const [filterCategory, setFilterCategory] = useState("all");
   const loaderRef = useRef<HTMLDivElement>(null);
 
-  // Handle product scanned from barcode scanner - copy EAN-13 if available
-  const handleProductScanned = (product: Product, _quantity: number) => {
-    if (product.codebarreEAN13) {
-      setForm({ ...form, codebarreEAN13: product.codebarreEAN13 });
-    }
+  const handleBarcodeDetected = (code: string) => {
+    setForm((prev) => ({ ...prev, codebarreEAN13: code }));
   };
 
   const [form, setForm] = useState({
@@ -53,12 +43,23 @@ export default function ProduitsPage() {
     unit: "pcs",
     currentStock: "0",
     minStock: "0",
-    maxStock: "",
+    maxStock: "0",
     location: "",
     codebarreEAN13: "",
     active: true,
     minStockAlarm: true,
   });
+
+  const checkDuplicateBarcode = (code: string): Product | null => {
+    if (!code.trim()) return null;
+    return products.find(
+      (p) =>
+        p.codebarreEAN13?.toLowerCase() === code.toLowerCase() &&
+        (!editProduct || p.id !== editProduct.id)
+    ) || null;
+  };
+
+  const duplicateProduct = form.codebarreEAN13 ? checkDuplicateBarcode(form.codebarreEAN13) : null;
 
   const loadData = async (reset = true) => {
     if (reset) {
@@ -85,11 +86,28 @@ export default function ProduitsPage() {
     }
   };
 
+  const loadCategories = async () => {
+    try {
+      setLoadingCategories(true);
+      const catList = await getCategories();
+      setCategories(catList.map(c => c.name));
+    } catch (error) {
+      console.error("Error loading categories:", error);
+    } finally {
+      setLoadingCategories(false);
+    }
+  };
+
   useEffect(() => {
     loadData(true);
+    loadCategories();
   }, []);
 
   const openCreate = () => {
+    if (!hasWriteAccess) {
+      alert("Vous n'avez pas les droits pour creer un produit.");
+      return;
+    }
     setEditProduct(null);
     setForm({
       code: "",
@@ -99,7 +117,7 @@ export default function ProduitsPage() {
       unit: "pcs",
       currentStock: "0",
       minStock: "0",
-      maxStock: "",
+      maxStock: "0",
       location: "",
       codebarreEAN13: "",
       active: true,
@@ -118,7 +136,7 @@ export default function ProduitsPage() {
       unit: product.unit,
       currentStock: String(product.currentStock),
       minStock: String(product.minStock),
-      maxStock: product.maxStock ? String(product.maxStock) : "",
+      maxStock: product.maxStock ? String(product.maxStock) : "0",
       location: product.location || "",
       codebarreEAN13: product.codebarreEAN13 || "",
       active: product.active ?? true,
@@ -128,6 +146,10 @@ export default function ProduitsPage() {
   };
 
   const handleSubmit = async () => {
+    if (!hasWriteAccess) {
+      alert("Vous n'avez pas les droits pour modifier les produits.");
+      return;
+    }
     if (!form.code || !form.name || !form.category) {
       alert("Veuillez remplir les champs obligatoires (code, nom, catégorie)");
       return;
@@ -145,19 +167,20 @@ export default function ProduitsPage() {
         minStock: parseInt(form.minStock) || 0,
         maxStock: form.maxStock ? parseInt(form.maxStock) : 0,
         location: form.location,
-        codebarreEAN13: form.codebarreEAN13 || '0',
+        codebarreEAN13: form.codebarreEAN13 || undefined,
         active: form.active,
         minStockAlarm: form.minStockAlarm,
       };
 
       if (editProduct) {
-        await updateProduct(editProduct.id, productData,  appUser?.email);
+        await updateProduct(editProduct.id, productData, appUser?.email);
       } else {
         await addProduct({
           ...productData,
           createdAt: new Date(),
           updatedAt: new Date(),
-          createdByEmail: appUser?.email
+          createdByEmail: appUser?.email,
+          updatedByEmail: appUser?.email,
         });
       }
 
@@ -172,6 +195,10 @@ export default function ProduitsPage() {
   };
 
   const handleDelete = async (product: Product) => {
+    if (!hasWriteAccess) {
+      alert("Vous n'avez pas les droits pour supprimer des produits.");
+      return;
+    }
     if (!confirm(`Supprimer le produit "${product.name}" ?`)) return;
     try {
       await deleteProduct(product.id);
@@ -181,8 +208,6 @@ export default function ProduitsPage() {
       alert("Erreur lors de la suppression");
     }
   };
-
-  const categories = ["all", ...CATEGORIES];
 
   const filteredProducts = products.filter((p) => {
     const matchSearch =
@@ -262,6 +287,24 @@ export default function ProduitsPage() {
               paddingBottom: "8px",
             }}
           >
+            <button
+              key="all"
+              onClick={() => setFilterCategory("all")}
+              style={{
+                padding: "6px 12px",
+                borderRadius: "20px",
+                border: "1px solid",
+                borderColor: filterCategory === "all" ? "#1e40af" : "#e2e8f0",
+                background: filterCategory === "all" ? "#1e40af" : "white",
+                color: filterCategory === "all" ? "white" : "#64748b",
+                fontSize: "12px",
+                fontWeight: "600",
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+              }}
+            >
+              Tous
+            </button>
             {categories.map((cat) => (
               <button
                 key={cat}
@@ -279,7 +322,7 @@ export default function ProduitsPage() {
                   whiteSpace: "nowrap",
                 }}
               >
-                {cat === "all" ? "Tous" : cat}
+                {cat}
               </button>
             ))}
           </div>
@@ -426,9 +469,116 @@ export default function ProduitsPage() {
       </div>
 
       {/* FAB */}
-      <button className="fab" onClick={openCreate}>
-        <Plus size={24} />
-      </button>
+      {hasWriteAccess && (
+        <button className="fab" onClick={openCreate}>
+          <Plus size={24} />
+        </button>
+      )}
+
+      {/* Bottom Menu */}
+      <div className="fixed bottom-0 left-0 right-0 flex justify-center items-center p-4 bg-white border-t border-gray-200 shadow-lg z-50">
+        <div className="relative">
+          <div
+            className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
+            onClick={() => {
+              setShowOperatorMenu(true);
+              setShowCategoriesMenu(true);
+              setShowAdminMenu(true);
+            }}
+          >
+            <Menu size={28} className="text-gray-600 hover:text-gray-800" />
+          </div>
+
+          {/* Operator Menu */}
+          {showOperatorMenu && (
+            <div className="absolute left-0 bottom-full mb-4 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-40">
+              <div className="px-4 py-2 border-b border-gray-200">
+                <h3 className="text-sm font-semibold text-gray-800">Opérateur</h3>
+                <button
+                  className="absolute right-2 top-2 text-gray-400 hover:text-gray-600"
+                  onClick={() => setShowOperatorMenu(false)}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="px-4 py-2">
+                <div className="text-sm text-gray-600">Gérer les opérateurs</div>
+              </div>
+            </div>
+          )}
+
+          {/* Categories Menu */}
+          {showCategoriesMenu && (
+            <div className="absolute bottom-full mb-4 left-1/2 -translate-x-1/2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 z-40">
+              <div className="px-4 py-2 border-b border-gray-200">
+                <h3 className="text-sm font-semibold text-gray-800">Catégories</h3>
+                <button
+                  className="absolute right-2 top-2 text-gray-400 hover:text-gray-600"
+                  onClick={() => setShowCategoriesMenu(false)}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="px-4 py-2 space-y-2">
+                {loadingCategories ? (
+                  <div className="text-sm text-gray-500">Chargement...</div>
+                ) : (
+                  <>
+                    {categories.map((cat, index) => (
+                      <div key={index} className="flex items-center py-1 text-sm">
+                        <span className="flex-1">{cat}</span>
+                      </div>
+                    ))}
+                    <div className="border-t pt-2">
+                      <input
+                        type="text"
+                        placeholder="Nouvelle catégorie"
+                        className="w-full px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            const input = e.target as HTMLInputElement;
+                            if (input.value.trim()) {
+                              addCategory(input.value.trim()).then(() => {
+                                input.value = "";
+                                loadCategories();
+                              });
+                            }
+                          }
+                        }}
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Admin Menu */}
+          {showAdminMenu && (
+            <div className="absolute right-0 bottom-full mb-4 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-40">
+              <div className="px-4 py-2 border-b border-gray-200">
+                <h3 className="text-sm font-semibold text-gray-800">Administration</h3>
+                <button
+                  className="absolute right-2 top-2 text-gray-400 hover:text-gray-600"
+                  onClick={() => setShowAdminMenu(false)}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="px-4 py-2 space-y-2">
+                {appUser?.role === "admin" ? (
+                  <>
+                    <div className="text-sm text-gray-600">Gestion des utilisateurs</div>
+                    <div className="text-sm text-gray-600">Paramètres système</div>
+                  </>
+                ) : (
+                  <div className="text-sm text-gray-500 italic">Accès réservé aux administrateurs</div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Modal */}
       {showModal && (
@@ -499,7 +649,7 @@ export default function ProduitsPage() {
                 onChange={(e) => setForm({ ...form, category: e.target.value })}
               >
                 <option value="">Sélectionner une catégorie</option>
-                {CATEGORIES.map((cat) => (
+                {categories.map((cat) => (
                   <option key={cat} value={cat}>
                     {cat}
                   </option>
@@ -544,7 +694,7 @@ export default function ProduitsPage() {
                   className="form-input"
                   type="number"
                   min="0"
-                  placeholder="0"
+                  placeholder="∞"
                   value={form.maxStock}
                   onChange={(e) => setForm({ ...form, maxStock: e.target.value })}
                 />
@@ -568,20 +718,42 @@ export default function ProduitsPage() {
                   className="form-input"
                   placeholder="Ex: 5901234123457"
                   value={form.codebarreEAN13}
-                  onChange={(e) => setForm({ ...form, codebarreEAN13: e.target.value })}
+                  onChange={(e) => setForm({ ...form, codebarreEAN13: e.target.value.toUpperCase() })}
                   style={{ flex: 1 }}
                 />
                 <button
                   type="button"
                   onClick={() => setShowScanner(true)}
                   className="btn btn-secondary"
-                  style={{ padding: "8px 12px", display: "flex", alignItems: "center", gap: "4px" , width: "80px"}}
+                  style={{ padding: "8px 12px", display: "flex", alignItems: "center", gap: "4px" , width: "110px"}}
                   title="Scanner un code-barres"
                 >
                   <ScanLine size={18} />
                   Scanner
                 </button>
               </div>
+              {duplicateProduct && (
+                <div style={{
+                  background: "#fef2f2",
+                  border: "1px solid #fecaca",
+                  borderRadius: "8px",
+                  padding: "10px",
+                  marginTop: "8px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px"
+                }}>
+                  <AlertTriangle size={16} style={{ color: "#dc2626", flexShrink: 0 }} />
+                  <div>
+                    <div style={{ color: "#dc2626", fontWeight: "600", fontSize: "13px" }}>
+                      Code-barres déjà utilisé
+                    </div>
+                    <div style={{ fontSize: "12px", color: "#64748b" }}>
+                      Le produit &quot;{duplicateProduct.name}&quot; ({duplicateProduct.code}) utilise déjà ce code-barres
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Checkboxes for active and alarm */}
@@ -633,12 +805,11 @@ export default function ProduitsPage() {
         </div>
       )}
 
-      {/* Barcode Scanner Modal - for copying EAN-13 from existing products */}
-      <BarcodeScannerModal
+      {/* Product Barcode Scanner */}
+      <ProductBarcodeScanner
         isOpen={showScanner}
         onClose={() => setShowScanner(false)}
-        products={products}
-        onProductScanned={handleProductScanned}
+        onCodeDetected={handleBarcodeDetected}
       />
     </div>
   );

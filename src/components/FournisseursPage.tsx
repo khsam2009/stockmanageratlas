@@ -14,6 +14,7 @@ export default function FournisseursPage() {
   const [editSupplier, setEditSupplier] = useState<Supplier | null>(null);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
+  const hasWriteAccess = appUser ? appUser.role === "admin" || appUser.permissions.fournisseurs === "write" : false;
 
   const [form, setForm] = useState({
     name: "",
@@ -42,6 +43,10 @@ export default function FournisseursPage() {
     loadData();
   }, []);
 
+    if (!hasWriteAccess) {
+      alert("Vous n'avez pas les droits pour creer un fournisseur.");
+      return;
+    }
   const openCreate = () => {
     setEditSupplier(null);
     setForm({
@@ -119,6 +124,10 @@ export default function FournisseursPage() {
   };
 
   const handleDelete = async (supplier: Supplier) => {
+    if (!hasWriteAccess) {
+      alert("Vous n'avez pas les droits pour supprimer un fournisseur.");
+      return;
+    }
     if (!confirm(`Supprimer le fournisseur "${supplier.name}" ?`)) return;
     try {
       await deleteSupplier(supplier.id);
@@ -334,9 +343,11 @@ export default function FournisseursPage() {
       </div>
 
       {/* FAB */}
-      <button className="fab" onClick={openCreate}>
-        <Plus size={24} />
-      </button>
+      {hasWriteAccess && (
+        <button className="fab" onClick={openCreate}>
+          <Plus size={24} />
+        </button>
+      )}
 
       {/* Modal */}
       {showModal && (

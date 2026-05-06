@@ -15,6 +15,7 @@ import {
 
 export default function InventairePage() {
   const { appUser } = useAuth();
+  const hasWriteAccess = appUser ? appUser.role === "admin" || appUser.permissions.inventaire === "write" : false;
   const [inventories, setInventories] = useState<Inventory[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [operators, setOperators] = useState<Operator[]>([]);
@@ -271,9 +272,11 @@ export default function InventairePage() {
       </div>
 
       {/* FAB */}
-      <button className="fab" onClick={() => setShowModal(true)}>
-        <Plus size={24} />
-      </button>
+      {hasWriteAccess && (
+        <button className="fab" onClick={() => setShowModal(true)}>
+          <Plus size={24} />
+        </button>
+      )}
 
       {/* Create Modal */}
       {showModal && (

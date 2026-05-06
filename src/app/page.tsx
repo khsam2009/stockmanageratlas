@@ -8,14 +8,17 @@ import {
   PackageMinus,
   ClipboardList,
   Package,
+  Boxes,
   ShieldCheck,
   LogOut,
   User,
   Truck,
   Users,
+  Settings,
 } from "lucide-react";
-import type { NavPage } from "@/lib/types";
+import type { NavPage, PagePermission } from "@/lib/types";
 import { useAuth } from "@/lib/AuthContext";
+import { ProtectedPage } from "@/lib/AuthContext";
 import { logoutUser } from "@/lib/auth";
 import LoginPage from "@/components/LoginPage";
 import Dashboard from "@/components/Dashboard";
@@ -24,9 +27,12 @@ import ReceptionPage from "@/components/ReceptionPage";
 import SortiePage from "@/components/SortiePage";
 import InventairePage from "@/components/InventairePage";
 import ProduitsPage from "@/components/ProduitsPage";
+import CategoriesPage from "@/components/CategoriesPage";
 import AdminPage from "@/components/AdminPage";
 import FournisseursPage from "@/components/FournisseursPage";
 import OperateursPage from "@/components/OperateursPage";
+import StockPage from "@/components/StockPage";
+import MonProfilPage from "@/components/MonProfilPage";
 
 interface NavItem {
   id: NavPage;
@@ -74,6 +80,18 @@ const ALL_NAV_ITEMS: NavItem[] = [
     permission: "produits",
   },
   {
+    id: "categories",
+    label: "Catégories",
+    icon: <LayoutDashboard size={22} />,
+    permission: "produits",
+  },
+  {
+    id: "stock",
+    label: "Stock",
+    icon: <Boxes size={22} />,
+    permission: "produits",
+  },
+  {
     id: "fournisseurs",
     label: "Fournisseurs",
     icon: <Truck size={22} />,
@@ -84,6 +102,12 @@ const ALL_NAV_ITEMS: NavItem[] = [
     label: "Opérateurs",
     icon: <Users size={22} />,
     permission: "operateurs",
+  },
+  {
+    id: "monprofil",
+    label: "Mon profil",
+    icon: <Settings size={22} />,
+    permission: "dashboard",
   },
   {
     id: "admin",
@@ -97,6 +121,7 @@ export default function Home() {
   const { appUser, loading, canAccess, isAdmin } = useAuth();
   const [activePage, setActivePage] = useState<NavPage>("dashboard");
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showOverflowMenu, setShowOverflowMenu] = useState(false);
 
   // Loading state
   if (loading) {
@@ -134,11 +159,17 @@ export default function Home() {
   }
 
   // Build visible nav items based on permissions
-  const visibleNavItems = ALL_NAV_ITEMS.filter((item) => {
+  const allVisibleNavItems = ALL_NAV_ITEMS.filter((item) => {
     if (item.adminOnly) return isAdmin;
     if (item.permission) return canAccess(item.permission);
     return true;
-  });
+  }).filter((item) => item.id !== "monprofil");
+
+  // Split into primary + overflow items
+  const primaryItems = allVisibleNavItems.filter((item) =>
+    ["dashboard", "mouvements", "reception", "sortie"].includes(item.id)
+  );
+  const overflowItems = allVisibleNavItems.filter((item) => !primaryItems.includes(item));
 
   // If current page is no longer accessible, redirect to first available
   const currentPageAccessible =
@@ -146,35 +177,93 @@ export default function Home() {
       ? isAdmin
       : activePage === "dashboard"
       ? canAccess("dashboard")
-      : canAccess(activePage as "mouvements" | "reception" | "sortie" | "inventaire" | "produits");
+      : canAccess(
+          activePage === "categories" || activePage === "stock"
+            ? "produits"
+            : (activePage as PagePermission)
+        );
 
   const effectivePage =
-    currentPageAccessible && visibleNavItems.some((n) => n.id === activePage)
+    currentPageAccessible
       ? activePage
-      : visibleNavItems[0]?.id ?? "dashboard";
+      : allVisibleNavItems[0]?.id ?? "dashboard";
 
   const renderPage = () => {
     switch (effectivePage) {
       case "dashboard":
-        return <Dashboard onNavigate={setActivePage} />;
+        return (
+          <ProtectedPage page="dashboard">
+            <Dashboard onNavigate={setActivePage} />
+          </ProtectedPage>
+        );
       case "mouvements":
-        return <MouvementsPage />;
+        return (
+          <ProtectedPage page="mouvements">
+            <MouvementsPage />
+          </ProtectedPage>
+        );
       case "reception":
-        return <ReceptionPage />;
+        return (
+          <ProtectedPage page="reception">
+            <ReceptionPage />
+          </ProtectedPage>
+        );
       case "sortie":
-        return <SortiePage />;
+        return (
+          <ProtectedPage page="sortie">
+            <SortiePage />
+          </ProtectedPage>
+        );
       case "inventaire":
-        return <InventairePage />;
+        return (
+          <ProtectedPage page="inventaire">
+            <InventairePage />
+          </ProtectedPage>
+        );
       case "produits":
-        return <ProduitsPage />;
+        return (
+          <ProtectedPage page="produits">
+            <ProduitsPage />
+          </ProtectedPage>
+        );
+      case "categories":
+        return (
+          <ProtectedPage page="produits">
+            <CategoriesPage />
+          </ProtectedPage>
+        );
+      case "stock":
+        return (
+          <ProtectedPage page="produits">
+            <StockPage />
+          </ProtectedPage>
+        );
       case "fournisseurs":
-        return <FournisseursPage />;
+        return (
+          <ProtectedPage page="fournisseurs">
+            <FournisseursPage />
+          </ProtectedPage>
+        );
       case "operateurs":
-        return <OperateursPage />;
+        return (
+          <ProtectedPage page="operateurs">
+            <OperateursPage />
+          </ProtectedPage>
+        );
+      case "monprofil":
+        return (
+          <ProtectedPage page="dashboard">
+            <MonProfilPage />
+          </ProtectedPage>
+        );
       case "admin":
         return <AdminPage />;
       default:
-        return <Dashboard onNavigate={setActivePage} />;
+        return (
+          <ProtectedPage page="dashboard">
+            <Dashboard onNavigate={setActivePage} />
+          </ProtectedPage>
+        );
     }
   };
 
@@ -201,6 +290,7 @@ export default function Home() {
           zIndex: 100,
           boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
         }}
+        onClick={() => setShowOverflowMenu(false)}
       >
         <span style={{ color: "white", fontSize: "15px", fontWeight: "700" }}>
           StockManager
@@ -293,7 +383,7 @@ export default function Home() {
 
             {/* Profile option */}
             <button
-              onClick={() => setShowUserMenu(false)}
+              onClick={() => { setActivePage("monprofil"); setShowUserMenu(false); }}
               style={{
                 width: "100%",
                 padding: "12px 16px",
@@ -338,13 +428,14 @@ export default function Home() {
       )}
 
       {/* Main content */}
-      <main style={{ paddingTop: "48px", paddingBottom: "70px" }}>
+      <main style={{ paddingTop: "48px", paddingBottom: "70px" }}   onClick={() => setShowOverflowMenu(false)}>
         {renderPage()}
       </main>
 
       {/* Bottom Navigation */}
       <nav className="bottom-nav">
-        {visibleNavItems.map((item) => (
+        {/* Primary items - always visible */}
+        {primaryItems.map((item) => (
           <button
             key={item.id}
             className={`nav-item ${effectivePage === item.id ? "active" : ""}`}
@@ -355,6 +446,75 @@ export default function Home() {
             <span className="nav-label">{item.label}</span>
           </button>
         ))}
+        {/* Overflow menu for additional items */}
+        {overflowItems.length > 0 && (
+          <div style={{ position: "relative" }}>
+            <button
+              className={`nav-item ${overflowItems.some(i => i.id === effectivePage) ? "active" : ""}`}
+              onClick={() => setShowOverflowMenu(!showOverflowMenu)}
+              style={{ background: "none", border: "none", position: "relative" }}
+              title="Plus de pages"
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="1"/>
+                <circle cx="12" cy="5" r="1"/>
+                <circle cx="12" cy="19" r="1"/>
+              </svg>
+              <span className="nav-label">Plus</span>
+            </button>
+            {showOverflowMenu && (
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: "100%",
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  background: "white",
+                  borderRadius: "12px",
+                  padding: "8px",
+                  minWidth: "160px",
+                  boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+                  zIndex: 1000,
+                  marginBottom: "8px",
+                }}
+                onClick={() => setShowOverflowMenu(false)}
+              >
+                {overflowItems.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      setActivePage(item.id);
+                      setShowOverflowMenu(false);
+                    }}
+                    style={{
+                      width: "100%",
+                      padding: "10px 14px",
+                      border: "none",
+                      background: effectivePage === item.id ? "#eff6ff" : "white",
+                      color: effectivePage === item.id ? "#2563eb" : "#374151",
+                      borderRadius: "8px",
+                      fontSize: "13px",
+                      fontWeight: "500",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      textAlign: "left",
+                    }}
+                  >
+                    {item.icon}
+                    <span style={{ flex: 1 }}>{item.label}</span>
+                    {effectivePage === item.id && (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </nav>
     </>
   );

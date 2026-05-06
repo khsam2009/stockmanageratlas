@@ -18,6 +18,7 @@ export default function ReceptionPage() {
   const { appUser } = useAuth();
   const [receptions, setReceptions] = useState<BonReception[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const hasWriteAccess = appUser ? appUser.role === "admin" || appUser.permissions.reception === "write" : false;
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [operators, setOperators] = useState<Operator[]>([]);
   const [loading, setLoading] = useState(true);
@@ -274,9 +275,11 @@ export default function ReceptionPage() {
       </div>
 
       {/* FAB */}
-      <button className="fab" onClick={() => setShowModal(true)}>
-        <Plus size={24} />
-      </button>
+      {hasWriteAccess && (
+        <button className="fab" onClick={() => setShowModal(true)}>
+          <Plus size={24} />
+        </button>
+      )}
 
       {/* Barcode Scanner Modal */}
       <BarcodeScannerModal

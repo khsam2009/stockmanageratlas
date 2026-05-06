@@ -32,9 +32,11 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+conte*.md
 
 # vercel
 .vercel
+FIREBASE_SETUP.md
 
 # typescript
 *.tsbuildinfo

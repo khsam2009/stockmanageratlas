@@ -18,6 +18,16 @@ export interface Product {
   updatedByEmail?: string;
 }
 
+export interface Categorie {
+  id: string;
+  name: string;
+  active: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  createdByEmail?: string;
+  updatedByEmail?: string;
+}
+
 export interface StockMovement {
   id: string;
   type: "entree" | "sortie";
@@ -105,16 +115,29 @@ export interface InventoryItem {
   notes?: string;
 }
 
-export type NavPage = "dashboard" | "mouvements" | "reception" | "sortie" | "inventaire" | "produits" | "admin" | "fournisseurs" | "operateurs";
+export type NavPage = "dashboard" | "mouvements" | "reception" | "sortie" | "inventaire" | "produits" | "categories" | "stock" | "monprofil" | "admin" | "fournisseurs" | "operateurs";
+
+export type PermissionLevel = "none" | "read" | "write";
 
 export type PagePermission = "dashboard" | "mouvements" | "reception" | "sortie" | "inventaire" | "produits" | "fournisseurs" | "operateurs";
+
+export interface UserPermissions {
+  dashboard: PermissionLevel;
+  mouvements: PermissionLevel;
+  reception: PermissionLevel;
+  sortie: PermissionLevel;
+  inventaire: PermissionLevel;
+  produits: PermissionLevel;
+  fournisseurs: PermissionLevel;
+  operateurs: PermissionLevel;
+}
 
 export interface AppUser {
   uid: string;
   email: string;
   displayName: string;
   role: "admin" | "user";
-  permissions: PagePermission[];
+  permissions: UserPermissions;
   active: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -125,7 +148,7 @@ export interface CreateUserData {
   password: string;
   displayName: string;
   role: "admin" | "user";
-  permissions: PagePermission[];
+  permissions?: UserPermissions;
 }
 
 export interface Supplier {

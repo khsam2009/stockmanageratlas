@@ -378,7 +378,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
               }}
             >
               <Clock size={18} />
-              Temps d& apos;approvisionnement
+              Temps d&apos;approvisionnement
             </h2>
             <div
               style={{

@@ -19,7 +19,7 @@ import {
   type DocumentData,
 } from "firebase/firestore";
 import { db } from "./firebase";
-import type { Product, StockMovement, BonReception, BonSortie, Inventory, Supplier, Operator } from "./types";
+import type { Product, StockMovement, BonReception, BonSortie, Inventory, Supplier, Operator, Categorie } from "./types";
 
 // ==================== PRODUCTS ====================
 export const productsCollection = collection(db, "products");
@@ -49,7 +49,7 @@ export async function getProducts(lastDoc?: { name: string }): Promise<{ product
   };
 }
 
-export async function addProduct(product: Omit<Product, "id"> ): Promise<string> {
+export async function addProduct(product: Omit<Product, "id">): Promise<string> {
   const docRef = await addDoc(productsCollection, {
     ...product,
     createdAt: Timestamp.now(),
@@ -427,6 +427,39 @@ export async function getMainSupplier(): Promise<Supplier | null> {
     createdAt: doc.data().createdAt?.toDate(),
     updatedAt: doc.data().updatedAt?.toDate(),
   } as Supplier;
+}
+
+// ==================== CATEGORIES ====================
+export const categoriesCollection = collection(db, "categories");
+
+export async function getCategories(): Promise<Categorie[]> {
+  const snapshot = await getDocs(categoriesCollection);
+  return snapshot.docs.map((doc) => { const d = doc.data(); return { id: doc.id, name: d.name as string, active: d.active ?? true, createdAt: d.createdAt?.toDate() ?? new Date(), updatedAt: d.updatedAt?.toDate() ?? new Date(), createdByEmail: d.createdByEmail, updatedByEmail: d.updatedByEmail }; });
+}
+
+export async function addCategory(name: string, email?: string): Promise<string> {
+  const docRef = await addDoc(categoriesCollection, {
+    name,
+    active: true,
+    createdAt: Timestamp.now(),
+    updatedAt: Timestamp.now(),
+    createdByEmail: email,
+    updatedByEmail: email,
+  });
+  return docRef.id;
+}
+
+export async function updateCategory(id: string, data: Partial<{ name: string }>, email?: string): Promise<void> {
+  const docRef = doc(db, "categories", id);
+  await updateDoc(docRef, { 
+    ...data, 
+    updatedAt: Timestamp.now(),
+    updatedByEmail: email,
+  });
+}
+
+export async function deleteCategory(id: string): Promise<void> {
+  await deleteDoc(doc(db, "categories", id));
 }
 
 // ==================== OPERATORS ====================

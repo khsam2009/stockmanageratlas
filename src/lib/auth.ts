@@ -131,16 +131,16 @@ export async function deleteAppUser(uid: string): Promise<void> {
  * Called once on app startup.
  */
 export async function bootstrapAdmin(): Promise<void> {
-  const ADMIN_EMAIL = "admin@stockmanager.com";
-  const ADMIN_PASSWORD = "Admin@123";
-  const ADMIN_NAME = "Administrateur";
+  const ADMIN_EMAIL = "****";
+  const ADMIN_PASSWORD = "****";
+  const ADMIN_NAME = "*****";
 
   try {
     // Try to sign in — if it works, admin already exists
     const credential = await signInWithEmailAndPassword(auth, ADMIN_EMAIL, ADMIN_PASSWORD);
     const profile = await getUserProfile(credential.user.uid);
 
-    if (!profile) {
+   /* if (!profile) {
       // Auth account exists but no Firestore profile — create it
       const adminPerms = {
         dashboard: "write",
@@ -162,13 +162,13 @@ export async function bootstrapAdmin(): Promise<void> {
         createdAt: now,
         updatedAt: now,
       });
-    }
+    }*/
 
     await signOut(auth);
   } catch {
     // Admin doesn't exist — create it
     try {
-      const credential = await createUserWithEmailAndPassword(auth, ADMIN_EMAIL, ADMIN_PASSWORD);
+     /* const credential = await createUserWithEmailAndPassword(auth, ADMIN_EMAIL, ADMIN_PASSWORD);
       await updateProfile(credential.user, { displayName: ADMIN_NAME });
 
       const adminPerms = {
@@ -190,7 +190,7 @@ export async function bootstrapAdmin(): Promise<void> {
         active: true,
         createdAt: now,
         updatedAt: now,
-      });
+      });*/
 
       await signOut(auth);
     } catch {

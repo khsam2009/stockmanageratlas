@@ -467,7 +467,7 @@ export default function Home() {
                 style={{
                   position: "absolute",
                   bottom: "100%",
-                  left: "50%",
+                  left: "0%",
                   transform: "translateX(-50%)",
                   background: "white",
                   borderRadius: "12px",

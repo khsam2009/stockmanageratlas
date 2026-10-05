@@ -2,6 +2,35 @@
 
 import type { BonReception, BonSortie, Inventory, StockMovement } from "./types";
 
+// ==================== STOCK EXPORT TYPES ====================
+
+export interface StockExportItem {
+  code: string;
+  name: string;
+  category: string;
+  stock: number;
+  unit: string;
+  minStock: number;
+}
+
+export interface StockExportFilters {
+  category: string; // "all" ou nom de catégorie
+  date: string; // "" = stock actuel, sinon "YYYY-MM-DD"
+  searchQuery: string; // recherche par nom ou code article
+}
+
+function formatDateInput(value: string): string {
+  if (!value) return "";
+  const [y, m, d] = value.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("fr-FR");
+}
+
+function stockStatusLabel(item: StockExportItem): string {
+  if (item.stock <= 0) return "Rupture";
+  if (item.stock <= item.minStock) return "Minimum";
+  return "OK";
+}
+
 // ==================== PDF EXPORT ====================
 
 async function getPdf() {
@@ -212,6 +241,58 @@ export async function exportMouvementsPDF(movements: StockMovement[], title = "M
   doc.save(`mouvements-stock.pdf`);
 }
 
+// --- Stock PDF ---
+export async function exportStockPDF(items: StockExportItem[], filters: StockExportFilters): Promise<void> {
+  const { jsPDF, autoTable } = await getPdf();
+  const doc = new jsPDF();
+
+  doc.setFontSize(18);
+  doc.setFont("helvetica", "bold");
+  doc.text("ÉTAT DU STOCK", 105, 20, { align: "center" });
+
+  const categoryLabel = filters.category && filters.category !== "all" ? filters.category : "Toutes";
+  const dateLabel = filters.date ? `Stock arrêté à la date du : ${formatDateInput(filters.date)}` : "Stock actuel";
+
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.text(`Généré le : ${new Date().toLocaleDateString("fr-FR")}`, 14, 30);
+  doc.text(`Catégorie : ${categoryLabel}`, 14, 36);
+  doc.text(dateLabel, 14, 42);
+  let nextY = 48;
+  if (filters.searchQuery) {
+    doc.text(`Recherche (nom ou code article) : "${filters.searchQuery}"`, 14, 48);
+    nextY = 54;
+  }
+  doc.text(`Total : ${items.length} article(s)`, 14, nextY);
+
+  autoTable(doc, {
+    startY: nextY + 6,
+    head: [["Code", "Article", "Catégorie", "Stock", "Unité", "Stock min", "Statut"]],
+    body: items.map((item) => [
+      item.code,
+      item.name,
+      item.category || "-",
+      item.stock,
+      item.unit,
+      item.minStock,
+      stockStatusLabel(item),
+    ]),
+    styles: { fontSize: 9 },
+    headStyles: { fillColor: [100, 116, 139] },
+    didParseCell: (data) => {
+      if (data.column.index === 3 && data.section === "body") {
+        const val = Number(data.cell.raw);
+        const minStock = items[data.row.index]?.minStock || 0;
+        if (val <= 0) data.cell.styles.textColor = [220, 38, 38];
+        else if (val <= minStock) data.cell.styles.textColor = [217, 119, 6];
+        else data.cell.styles.textColor = [22, 163, 74];
+      }
+    },
+  });
+
+  doc.save(`stock-${filters.date || "actuel"}.pdf`);
+}
+
 // ==================== EXCEL EXPORT ====================
 
 async function getXlsx() {
@@ -332,6 +413,37 @@ export async function exportMouvementsExcel(movements: StockMovement[]): Promise
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Mouvements");
   XLSX.writeFile(wb, `mouvements-stock.xlsx`);
+}
+
+export async function exportStockExcel(items: StockExportItem[], filters: StockExportFilters): Promise<void> {
+  const XLSX = await getXlsx();
+
+  const categoryLabel = filters.category && filters.category !== "all" ? filters.category : "Toutes";
+  const dateLabel = filters.date ? `Stock arrêté à la date du : ${formatDateInput(filters.date)}` : "Stock actuel";
+
+  const rows = [
+    ["ÉTAT DU STOCK"],
+    [`Généré le : ${new Date().toLocaleDateString("fr-FR")}`],
+    [`Catégorie : ${categoryLabel}`],
+    [dateLabel],
+    ...(filters.searchQuery ? [[`Recherche (nom ou code article) : "${filters.searchQuery}"`]] : []),
+    [],
+    ["Code", "Article", "Catégorie", "Stock", "Unité", "Stock min", "Statut"],
+    ...items.map((item) => [
+      item.code,
+      item.name,
+      item.category || "-",
+      item.stock,
+      item.unit,
+      item.minStock,
+      stockStatusLabel(item),
+    ]),
+  ];
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Stock");
+  XLSX.writeFile(wb, `stock-${filters.date || "actuel"}.xlsx`);
 }
 
 // ==================== WORD EXPORT ====================
@@ -589,6 +701,59 @@ export async function exportMouvementsWord(movements: StockMovement[]): Promise<
 
   const blob = await Packer.toBlob(doc);
   downloadBlob(blob, `mouvements-stock.docx`);
+}
+
+export async function exportStockWord(items: StockExportItem[], filters: StockExportFilters): Promise<void> {
+  const docx = await getDocx();
+  const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } = docx;
+
+  const categoryLabel = filters.category && filters.category !== "all" ? filters.category : "Toutes";
+  const dateLabel = filters.date ? `Arrêté à la date du ${formatDateInput(filters.date)}` : "Actuel";
+
+  const doc = new Document({
+    sections: [
+      {
+        children: [
+          new Paragraph({
+            text: "ÉTAT DU STOCK",
+            heading: HeadingLevel.HEADING_1,
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 300 },
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: `Généré le : ${new Date().toLocaleDateString("fr-FR")}` }),
+            ],
+            spacing: { after: 200 },
+          }),
+          infoLine(docx, "Catégorie", categoryLabel),
+          infoLine(docx, "Stock", dateLabel),
+          ...(filters.searchQuery ? [infoLine(docx, "Recherche (nom ou code article)", `"${filters.searchQuery}"`)] : []),
+          new Paragraph({ text: "", spacing: { after: 200 } }),
+          new Paragraph({
+            children: [new TextRun({ text: "Détail des articles", bold: true, size: 24 })],
+            spacing: { after: 150 },
+          }),
+          makeDocxTable(
+            docx,
+            ["Code", "Article", "Catégorie", "Stock", "Unité", "Stock min", "Statut"],
+            items.map((item) => [
+              item.code,
+              item.name,
+              item.category || "-",
+              item.stock,
+              item.unit,
+              item.minStock,
+              stockStatusLabel(item),
+            ])
+          ),
+        ],
+      },
+    ],
+  });
+
+  const blob = await Packer.toBlob(doc);
+  downloadBlob(blob, `stock-${filters.date || "actuel"}.docx`);
 }
 
 // ==================== HELPERS ====================

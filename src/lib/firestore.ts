@@ -99,6 +99,46 @@ export async function getMovements(lastDoc?: { date: Date }): Promise<{ movement
   };
 }
 
+export async function getMovementsUpToDate(endDate: Date): Promise<StockMovement[]> {
+  const q = query(
+    movementsCollection,
+    where("date", "<=", Timestamp.fromDate(endDate)),
+    orderBy("date", "asc")
+  );
+  
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((doc) => ({
+    id: doc.id,
+    ...doc.data(),
+    date: doc.data().date?.toDate(),
+  })) as StockMovement[];
+}
+
+export async function getLastValidatedInventoryBeforeDate(beforeDate: Date): Promise<Inventory | null> {
+  // Fetch all inventories ordered by startDate desc (single-field orderBy, no composite index needed)
+  const q = query(inventoriesCollection, orderBy("startDate", "desc"));
+  
+  const snapshot = await getDocs(q);
+  
+  const beforeTimestamp = Timestamp.fromDate(beforeDate);
+  
+  for (const doc of snapshot.docs) {
+    const data = doc.data();
+    // Filter client-side: validated and started before the given date
+    if (data.status === "valide" && data.startDate && data.startDate.toMillis() <= beforeTimestamp.toMillis()) {
+      return {
+        id: doc.id,
+        ...data,
+        startDate: data.startDate?.toDate(),
+        endDate: data.endDate?.toDate(),
+        createdAt: data.createdAt?.toDate(),
+      } as Inventory;
+    }
+  }
+  
+  return null;
+}
+ 
 export async function addMovement(movement: Omit<StockMovement, "id">): Promise<string> {
   const docRef = await addDoc(movementsCollection, {
     ...movement,

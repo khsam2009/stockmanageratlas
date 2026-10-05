@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
-import { Package, TrendingDown, AlertTriangle, ArrowUpDown, Filter, Search } from "lucide-react";
-import { getProducts } from "@/lib/firestore";
+import { useState, useEffect, useMemo } from "react";
+import { Package, TrendingDown, AlertTriangle, ArrowUpDown, Filter, Search, Calendar } from "lucide-react";
+import { getProducts, getMovementsUpToDate, getLastValidatedInventoryBeforeDate } from "@/lib/firestore";
 import { useAuth } from "@/lib/AuthContext";
-import type { Product } from "@/lib/types";
+import type { Product, StockMovement, Inventory } from "@/lib/types";
 
 export default function StockPage() {
   const { appUser } = useAuth();
@@ -15,6 +15,35 @@ export default function StockPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc"); // asc = stock croissant, desc = stock décroissant
+  const [selectedMonth, setSelectedMonth] = useState<string>("current"); // "current" or "YYYY-MM"
+
+  // Historical stock data
+  const [historicalStock, setHistoricalStock] = useState<Map<string, number>>(new Map());
+  const [historicalLoading, setHistoricalLoading] = useState(false);
+
+  // Generate months list from current month down to last month of previous year (ascending order in dropdown)
+  const monthsList = useMemo(() => {
+    const months = [];
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth(); // 0-11
+    
+    // Start from current month, go back to January of previous year
+    for (let offset = 0; offset <= 11; offset++) {
+      let month = currentMonth - offset;
+      let year = currentYear;
+      
+      if (month < 0) {
+        month += 12;
+        year -= 1;
+      }
+      
+      const monthStr = `${year}-${String(month + 1).padStart(2, "0")}`;
+      const monthName = new Date(year, month).toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+      months.push({ value: monthStr, label: monthName.charAt(0).toUpperCase() + monthName.slice(1) });
+    }
+    return months;
+  }, []);
 
   const loadProducts = async () => {
     setLoading(true);
@@ -37,16 +66,81 @@ export default function StockPage() {
     loadProducts();
   }, []);
 
+  // Load historical stock when month changes
+  useEffect(() => {
+    if (selectedMonth === "current") {
+      setHistoricalStock(new Map());
+      return;
+    }
+
+    const loadHistoricalStock = async () => {
+      setHistoricalLoading(true);
+      try {
+        const [yearStr, monthStr] = selectedMonth.split("-");
+        const year = parseInt(yearStr);
+        const month = parseInt(monthStr) - 1; // 0-indexed
+        const endOfMonth = new Date(year, month + 1, 0, 23, 59, 59, 999); // Last day of month at 23:59:59
+        const startOfYear = new Date(year, 0, 1); // January 1st of selected year
+        
+        // Get last validated inventory before end of selected month
+        const lastInventory = await getLastValidatedInventoryBeforeDate(endOfMonth);
+        
+        let baseStock = new Map<string, number>();
+        let movementsStartDate = startOfYear;
+        
+        if (lastInventory) {
+          // Use inventory physical stock as base
+          for (const item of lastInventory.items) {
+            baseStock.set(item.productId, item.physicalStock);
+          }
+          // Movements after inventory end date (or start date if no end date)
+          movementsStartDate = lastInventory.endDate || lastInventory.startDate;
+        }
+        
+        // Get movements from movementsStartDate to endOfMonth
+        const movements = await getMovementsUpToDate(endOfMonth);
+        
+        // Filter movements after the base date
+        const relevantMovements = movements.filter(m => m.date >= movementsStartDate);
+        
+        // Apply movements to base stock
+        const stockMap = new Map<string, number>(baseStock);
+        
+        for (const movement of relevantMovements) {
+          const current = stockMap.get(movement.productId) || 0;
+          if (movement.type === "entree") {
+            stockMap.set(movement.productId, current + movement.quantity);
+          } else {
+            stockMap.set(movement.productId, current - movement.quantity);
+          }
+        }
+        
+        setHistoricalStock(stockMap);
+      } catch (error) {
+        console.error("Erreur chargement stock historique:", error);
+      } finally {
+        setHistoricalLoading(false);
+      }
+    };
+
+    loadHistoricalStock();
+  }, [selectedMonth]);
+
   // Calculer le résumé
-  const outOfStockCount = products.filter(p => p.currentStock <= 0).length;
-  const negativeStockCount = products.filter(p => p.currentStock < 0).length;
-  const lowStockCount = products.filter(p => p.currentStock > 0 && p.currentStock <= (p.minStock || 0)).length;
+  const getStock = (product: Product) => selectedMonth === "current" ? product.currentStock : (historicalStock.get(product.id) || 0);
+  
+  const outOfStockCount = products.filter(p => getStock(p) <= 0).length;
+  const negativeStockCount = products.filter(p => getStock(p) < 0).length;
+  const lowStockCount = products.filter(p => getStock(p) > 0 && getStock(p) <= (p.minStock || 0)).length;
 
   // Filtrer et trier les produits
   const filteredProducts = products
     .filter((p) => {
+      // Get stock for this product (historical or current)
+      const stock = selectedMonth === "current" ? p.currentStock : (historicalStock.get(p.id) || 0);
+      
       // Filtre par statut positif
-      if (showPositiveOnly && p.currentStock <= 0) return false;
+      if (showPositiveOnly && stock <= 0) return false;
       // Filtre par catégorie
       if (selectedCategory !== "all" && p.category !== selectedCategory) return false;
       // Filtre par recherche (nom ou code/EAN)
@@ -60,10 +154,13 @@ export default function StockPage() {
       return true;
     })
     .sort((a, b) => {
+      const stockA = selectedMonth === "current" ? a.currentStock : (historicalStock.get(a.id) || 0);
+      const stockB = selectedMonth === "current" ? b.currentStock : (historicalStock.get(b.id) || 0);
+      
       if (sortOrder === "asc") {
-        return a.currentStock - b.currentStock;
+        return stockA - stockB;
       } else {
-        return b.currentStock - a.currentStock;
+        return stockB - stockA;
       }
     });
 
@@ -95,7 +192,12 @@ export default function StockPage() {
       <div className="page-header">
         <div>
           <div className="page-title">Stock des articles</div>
-          <div className="page-subtitle">{products.length} article(s) au total</div>
+          <div className="page-subtitle">
+            {selectedMonth === "current" 
+              ? `${products.length} article(s) au total` 
+              : `Stock au ${monthsList.find(m => m.value === selectedMonth)?.label || selectedMonth} — ${products.length} article(s)`
+            }
+          </div>
         </div>
       </div>
 
@@ -203,7 +305,7 @@ export default function StockPage() {
           flexDirection: "column",
           gap: "12px"
         }}>
-          {/* Ligne 1: Checkbox positifs + bouton tri */}
+          {/* Ligne 1: Checkbox positifs + bouton tri + filtre mois */}
           <div style={{ 
             display: "flex", 
             alignItems: "center", 
@@ -236,26 +338,58 @@ export default function StockPage() {
               </label>
             </div>
 
-            <button
-              onClick={toggleSortOrder}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-                padding: "8px 14px",
-                background: sortOrder === "asc" ? "#10b981" : "#ef4444",
-                color: "white",
-                border: "none",
-                borderRadius: "8px",
-                fontSize: "13px",
-                fontWeight: "600",
-                cursor: "pointer",
-                transition: "all 0.2s"
-              }}
-            >
-              <ArrowUpDown size={16} />
-              Stock {sortOrder === "asc" ? "Croissant" : "Décroissant"}
-            </button>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+              <button
+                onClick={toggleSortOrder}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  padding: "8px 14px",
+                  background: sortOrder === "asc" ? "#10b981" : "#ef4444",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "8px",
+                  fontSize: "13px",
+                  fontWeight: "600",
+                  cursor: "pointer",
+                  transition: "all 0.2s"
+                }}
+              >
+                <ArrowUpDown size={16} />
+                Stock {sortOrder === "asc" ? "Croissant" : "Décroissant"}
+              </button>
+
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <label style={{ fontSize: "14px", fontWeight: "600", color: "#475569" }}>
+                  <Calendar size={16} style={{ marginRight: "6px", verticalAlign: "middle" }} />
+                  Mois :
+                </label>
+                <select
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                  disabled={historicalLoading}
+                  style={{
+                    padding: "8px 14px",
+                    border: "1.5px solid #e2e8f0",
+                    borderRadius: "8px",
+                    fontSize: "14px",
+                    background: "white",
+                    cursor: "pointer",
+                    minWidth: "200px",
+                    opacity: historicalLoading ? 0.6 : 1
+                  }}
+                >
+                  <option value="current">Stock actuel</option>
+                  {monthsList.map((m) => (
+                    <option key={m.value} value={m.value}>{m.label}</option>
+                  ))}
+                </select>
+                {historicalLoading && (
+                  <span style={{ fontSize: "12px", color: "#64748b" }}>Chargement...</span>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Ligne 2: Recherche + Filtre catégorie */}
@@ -324,7 +458,7 @@ export default function StockPage() {
             <table style={{ 
               width: "100%", 
               borderCollapse: "collapse",
-              minWidth: "380px"
+              minWidth: "600px"
             }}>
               <thead>
                 <tr style={{ background: "#f8fafc", borderBottom: "2px solid #e2e8f0" }}>
@@ -344,10 +478,11 @@ export default function StockPage() {
               </thead>
               <tbody>
                 {filteredProducts.map((product) => {
-                  const isOutOfStock = product.currentStock <= 0;
-                  const isNegative = product.currentStock < 0;
-                  const isLowStock = product.currentStock > 0 && product.currentStock <= (product.minStock || 0);
-                  const isBelowMin = product.currentStock < (product.minStock || 0);
+                  const stock = selectedMonth === "current" ? product.currentStock : (historicalStock.get(product.id) || 0);
+                  const isOutOfStock = stock <= 0;
+                  const isNegative = stock < 0;
+                  const isLowStock = stock > 0 && stock <= (product.minStock || 0);
+                  const isBelowMin = stock < (product.minStock || 0);
                   
                   return (
                     <tr 
@@ -363,7 +498,7 @@ export default function StockPage() {
                           {product.name}
                         </div>
                         <div style={{ fontSize: "12px", color: "#64748b", marginTop: "2px" }}>
-                          {product.description || ""}
+                          {product.description || "-"}
                         </div>
                       </td>
                       <td style={{ padding: "16px", verticalAlign: "top" }}>
@@ -378,7 +513,7 @@ export default function StockPage() {
                             color: isOutOfStock ? "#dc2626" : (isLowStock ? "#d97706" : "#16a34a"),
                             fontFamily: "monospace"
                           }}>
-                            {product.currentStock}
+                            {stock}
                           </span>
                           <span style={{
                             fontSize: "12px",

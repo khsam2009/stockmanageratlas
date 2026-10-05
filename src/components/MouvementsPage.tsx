@@ -23,6 +23,8 @@ export default function MouvementsPage() {
   const [showModal, setShowModal] = useState(false);
   const [filter, setFilter] = useState<"all" | "entree" | "sortie">("all");
   const [search, setSearch] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [saving, setSaving] = useState(false);
   const hasWriteAccess = appUser ? appUser.role === "admin" || appUser.permissions.mouvements === "write" : false;
   const [showScanner, setShowScanner] = useState(false);
@@ -55,13 +57,20 @@ export default function MouvementsPage() {
     loadData();
   }, []);
 
+  const now = new Date();
+  const yearStart = new Date(now.getFullYear(), 0, 1);
+  const effectiveStart = startDate ? new Date(`${startDate}T00:00:00`) : yearStart;
+  const effectiveEnd = endDate ? new Date(`${endDate}T23:59:59.999`) : now;
+
   const filteredMovements = movements.filter((m) => {
     const matchFilter = filter === "all" || m.type === filter;
     const matchSearch =
       search === "" ||
       m.productName.toLowerCase().includes(search.toLowerCase()) ||
       m.reason.toLowerCase().includes(search.toLowerCase());
-    return matchFilter && matchSearch;
+    const movementDate = m.date instanceof Date ? m.date : new Date(m.date);
+    const matchDate = movementDate >= effectiveStart && movementDate <= effectiveEnd;
+    return matchFilter && matchSearch && matchDate;
   });
 
   const filteredProducts = products.map((p) => ({
@@ -184,6 +193,64 @@ export default function MouvementsPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
+          </div>
+
+          {/* Date filter */}
+          <div style={{ display: "flex", gap: "8px", alignItems: "flex-end", marginBottom: "8px" }}>
+            <div style={{ flex: 1 }}>
+              <label className="form-label" style={{ marginBottom: "4px", fontSize: "12px" }}>
+                Du
+              </label>
+              <input
+                className="form-input"
+                type="date"
+                value={startDate}
+                max={endDate || undefined}
+                onChange={(e) => setStartDate(e.target.value)}
+                style={{ padding: "8px 10px", fontSize: "13px" }}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label className="form-label" style={{ marginBottom: "4px", fontSize: "12px" }}>
+                Au
+              </label>
+              <input
+                className="form-input"
+                type="date"
+                value={endDate}
+                min={startDate || undefined}
+                onChange={(e) => setEndDate(e.target.value)}
+                style={{ padding: "8px 10px", fontSize: "13px" }}
+              />
+            </div>
+            {(startDate !== "" || endDate !== "") && (
+              <button
+                onClick={() => {
+                  setStartDate("");
+                  setEndDate("");
+                }}
+                title="Réinitialiser les dates"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: "38px",
+                  height: "38px",
+                  border: "1.5px solid var(--border)",
+                  borderRadius: "10px",
+                  background: "white",
+                  cursor: "pointer",
+                  color: "#64748b",
+                  flexShrink: 0,
+                }}
+              >
+                <X size={16} />
+              </button>
+            )}
+          </div>
+          <div style={{ fontSize: "11px", color: "#94a3b8", marginBottom: "12px" }}>
+            Période : {effectiveStart.toLocaleDateString("fr-FR")} → {effectiveEnd.toLocaleDateString("fr-FR")}
+            {!startDate && !endDate && " (par défaut)"}
           </div>
 
           {/* Filter tabs */}

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Plus, X, CheckCircle, Eye, ClipboardList, AlertTriangle, Loader2 } from "lucide-react";
-import { getInventories, addInventory, updateInventory, validateInventory, getProducts, getOperators } from "@/lib/firestore";
+import { getAllInventories, addInventory, updateInventory, validateInventory, getAllProducts, getOperators } from "@/lib/firestore";
 import { useAuth } from "@/lib/AuthContext";
 import type { Inventory, InventoryItem, Product, Operator } from "@/lib/types";
 import ExportButton from "@/components/ExportButton";
@@ -36,14 +36,14 @@ export default function InventairePage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [invsResult, prodsResult, opsResult] = await Promise.all([
-        getInventories(),
-        getProducts(),
+      const [invs, prods, ops] = await Promise.all([
+        getAllInventories(),
+        getAllProducts(),
         getOperators(),
       ]);
-      setInventories(invsResult.inventories);
-      setProducts(prodsResult.products);
-      setOperators(opsResult);
+      setInventories(invs);
+      setProducts(prods);
+      setOperators(ops);
     } catch (error) {
       console.error(error);
     } finally {

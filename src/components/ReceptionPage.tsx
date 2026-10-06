@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Plus, X, CheckCircle, Eye, Trash2, PackagePlus, ScanLine, Loader2 } from "lucide-react";
-import { getReceptions, addReception, validateReception, getProducts, getSuppliers, getOperators } from "@/lib/firestore";
+import { getAllReceptions, addReception, validateReception, getAllProducts, getSuppliers, getOperators } from "@/lib/firestore";
 import { useAuth } from "@/lib/AuthContext";
 import type { BonReception, BonReceptionItem, Product, Supplier, Operator } from "@/lib/types";
 import ExportButton from "@/components/ExportButton";
@@ -45,16 +45,16 @@ export default function ReceptionPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [recsResult, prodsResult, suppsResult, opsResult] = await Promise.all([
-        getReceptions(),
-        getProducts(),
+      const [recs, prods, supps, ops] = await Promise.all([
+        getAllReceptions(),
+        getAllProducts(),
         getSuppliers(),
         getOperators(),
       ]);
-      setReceptions(recsResult.receptions);
-      setProducts(prodsResult.products);
-      setSuppliers(suppsResult);
-      setOperators(opsResult);
+      setReceptions(recs);
+      setProducts(prods);
+      setSuppliers(supps);
+      setOperators(ops);
     } catch (error) {
       console.error(error);
     } finally {

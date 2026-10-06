@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { User, Mail, Calendar, Shield, Package, ArrowLeftRight, Lock, Save, AlertCircle } from "lucide-react";
-import { getProducts, getMovements } from "@/lib/firestore";
+import { getAllProducts, getAllMovements } from "@/lib/firestore";
 import { useAuth } from "@/lib/AuthContext";
 import type { Product, StockMovement } from "@/lib/types";
 
@@ -33,18 +33,18 @@ export default function MonProfilPage() {
     try {
       if (appUser?.email) {
         const [productsResult, mouvementsResult] = await Promise.all([
-          getProducts(),
-          getMovements(),
+          getAllProducts(),
+          getAllMovements(),
         ]);
         
         // Compter les produits créés par cet utilisateur
-        const myProducts = productsResult.products.filter(
+        const myProducts = productsResult.filter(
           (p: Product) => p.createdByEmail === appUser.email
         );
         setProductsCount(myProducts.length);
 
         // Compter les mouvements créés par cet utilisateur
-        const myMouvements = mouvementsResult.movements.filter(
+        const myMouvements = mouvementsResult.filter(
           (m: StockMovement) => m.operatorEmail === appUser.email
         );
         setMouvementsCount(myMouvements.length);
@@ -335,8 +335,8 @@ export default function MonProfilPage() {
               const labelMap: Record<string, string> = {
                 dashboard: "Tableau de bord",
                 mouvements: "Mouvements",
-                reception: "Bon de Réception",
-                sortie: "Bon de Sortie",
+                reception: "Réception",
+                sortie: "Sortie",
                 inventaire: "Inventaire",
                 produits: "Produits",
                 fournisseurs: "Fournisseurs",
@@ -360,7 +360,7 @@ export default function MonProfilPage() {
                   border: "1px solid #e2e8f0"
                 }}>
                   <div style={{ fontSize: "12px", color: "#64748b", marginBottom: "4px" }}>
-                    {labelMap[level] || level}
+                    {labelMap[key] || key}
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                     <div style={{

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Plus, X, CheckCircle, Eye, Trash2, PackageMinus, ScanLine, Loader2 } from "lucide-react";
-import { getSorties, addSortie, validateSortie, getProducts, getOperators } from "@/lib/firestore";
+import { getAllSorties, addSortie, validateSortie, getAllProducts, getOperators } from "@/lib/firestore";
 import { useAuth } from "@/lib/AuthContext";
 import type { BonSortie, BonSortieItem, Product, Operator } from "@/lib/types";
 import ExportButton from "@/components/ExportButton";
@@ -45,14 +45,14 @@ export default function SortiePage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [sorsResult, prodsResult, opsResult] = await Promise.all([
-        getSorties(),
-        getProducts(),
+      const [sors, prods, ops] = await Promise.all([
+        getAllSorties(),
+        getAllProducts(),
         getOperators(),
       ]);
-      setSorties(sorsResult.sorties);
-      setProducts(prodsResult.products);
-      setOperators(opsResult);
+      setSorties(sors);
+      setProducts(prods);
+      setOperators(ops);
     } catch (error) {
       console.error(error);
     } finally {

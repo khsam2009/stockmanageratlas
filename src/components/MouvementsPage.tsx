@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Plus, TrendingUp, TrendingDown, Search, X, Filter, ScanLine, Loader2 } from "lucide-react";
-import { getMovements, addMovement, getProducts, getOperators } from "@/lib/firestore";
+import { getAllMovements, addMovement, getAllProducts, getOperators } from "@/lib/firestore";
 import { useAuth } from "@/lib/AuthContext";
 import type { StockMovement, Product, Operator } from "@/lib/types";
 import ExportButton from "@/components/ExportButton";
@@ -42,10 +42,10 @@ export default function MouvementsPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [movsResult, prodsResult, opsResult] = await Promise.all([getMovements(), getProducts(), getOperators()]);
-      setMovements(movsResult.movements);
-      setProducts(prodsResult.products);
-      setOperators(opsResult);
+      const [movs, prods, ops] = await Promise.all([getAllMovements(), getAllProducts(), getOperators()]);
+      setMovements(movs);
+      setProducts(prods);
+      setOperators(ops);
     } catch (error) {
       console.error(error);
     } finally {

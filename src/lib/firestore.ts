@@ -49,6 +49,18 @@ export async function getProducts(lastDoc?: { name: string }): Promise<{ product
   };
 }
 
+export async function getAllProducts(): Promise<Product[]> {
+  const q = query(productsCollection, orderBy("name"));
+
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((doc) => ({
+    id: doc.id,
+    ...doc.data(),
+    createdAt: doc.data().createdAt?.toDate(),
+    updatedAt: doc.data().updatedAt?.toDate(),
+  })) as Product[];
+}
+
 export async function addProduct(product: Omit<Product, "id">): Promise<string> {
   const docRef = await addDoc(productsCollection, {
     ...product,
@@ -99,13 +111,9 @@ export async function getMovements(lastDoc?: { date: Date }): Promise<{ movement
   };
 }
 
-export async function getMovementsUpToDate(endDate: Date): Promise<StockMovement[]> {
-  const q = query(
-    movementsCollection,
-    where("date", "<=", Timestamp.fromDate(endDate)),
-    orderBy("date", "asc")
-  );
-  
+export async function getAllMovements(): Promise<StockMovement[]> {
+  const q = query(movementsCollection, orderBy("date", "desc"));
+
   const snapshot = await getDocs(q);
   return snapshot.docs.map((doc) => ({
     id: doc.id,
@@ -114,29 +122,19 @@ export async function getMovementsUpToDate(endDate: Date): Promise<StockMovement
   })) as StockMovement[];
 }
 
-export async function getLastValidatedInventoryBeforeDate(beforeDate: Date): Promise<Inventory | null> {
-  // Fetch all inventories ordered by startDate desc (single-field orderBy, no composite index needed)
-  const q = query(inventoriesCollection, orderBy("startDate", "desc"));
-  
+export async function getMovementsFromDate(startDate: Date): Promise<StockMovement[]> {
+  const q = query(
+    movementsCollection,
+    where("date", ">=", Timestamp.fromDate(startDate)),
+    orderBy("date", "asc")
+  );
+
   const snapshot = await getDocs(q);
-  
-  const beforeTimestamp = Timestamp.fromDate(beforeDate);
-  
-  for (const doc of snapshot.docs) {
-    const data = doc.data();
-    // Filter client-side: validated and started before the given date
-    if (data.status === "valide" && data.startDate && data.startDate.toMillis() <= beforeTimestamp.toMillis()) {
-      return {
-        id: doc.id,
-        ...data,
-        startDate: data.startDate?.toDate(),
-        endDate: data.endDate?.toDate(),
-        createdAt: data.createdAt?.toDate(),
-      } as Inventory;
-    }
-  }
-  
-  return null;
+  return snapshot.docs.map((doc) => ({
+    id: doc.id,
+    ...doc.data(),
+    date: doc.data().date?.toDate(),
+  })) as StockMovement[];
 }
  
 export async function addMovement(movement: Omit<StockMovement, "id">): Promise<string> {
@@ -191,6 +189,18 @@ export async function getReceptions(lastDoc?: { date: Date }): Promise<{ recepti
     lastDoc: lastDocument ? { date: lastDocument.data().date?.toDate() as Date } : null,
     hasMore: snapshot.docs.length === RECEPTIONS_PAGE_SIZE,
   };
+}
+
+export async function getAllReceptions(): Promise<BonReception[]> {
+  const q = query(receptionsCollection, orderBy("date", "desc"));
+
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((doc) => ({
+    id: doc.id,
+    ...doc.data(),
+    date: doc.data().date?.toDate(),
+    createdAt: doc.data().createdAt?.toDate(),
+  })) as BonReception[];
 }
 
 export async function addReception(reception: Omit<BonReception, "id">): Promise<string> {
@@ -264,6 +274,18 @@ export async function getSorties(lastDoc?: { date: Date }): Promise<{ sorties: B
   };
 }
 
+export async function getAllSorties(): Promise<BonSortie[]> {
+  const q = query(sortiesCollection, orderBy("date", "desc"));
+
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((doc) => ({
+    id: doc.id,
+    ...doc.data(),
+    date: doc.data().date?.toDate(),
+    createdAt: doc.data().createdAt?.toDate(),
+  })) as BonSortie[];
+}
+
 export async function addSortie(sortie: Omit<BonSortie, "id">): Promise<string> {
   const docRef = await addDoc(sortiesCollection, {
     ...sortie,
@@ -334,6 +356,19 @@ export async function getInventories(lastDoc?: { startDate: Date }): Promise<{ i
     lastDoc: lastDocument ? { startDate: lastDocument.data().startDate?.toDate() as Date } : null,
     hasMore: snapshot.docs.length === INVENTORIES_PAGE_SIZE,
   };
+}
+
+export async function getAllInventories(): Promise<Inventory[]> {
+  const q = query(inventoriesCollection, orderBy("startDate", "desc"));
+
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((doc) => ({
+    id: doc.id,
+    ...doc.data(),
+    startDate: doc.data().startDate?.toDate(),
+    endDate: doc.data().endDate?.toDate(),
+    createdAt: doc.data().createdAt?.toDate(),
+  })) as Inventory[];
 }
 
 export async function addInventory(inventory: Omit<Inventory, "id">): Promise<string> {

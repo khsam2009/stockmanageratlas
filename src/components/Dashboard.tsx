@@ -14,7 +14,7 @@ import {
   BarChart3,
   Clock,
 } from "lucide-react";
-import { getProducts, getMovements, getReceptions } from "@/lib/firestore";
+import { getAllProducts, getAllMovements, getAllReceptions } from "@/lib/firestore";
 import type { Product, StockMovement, NavPage, BonReception } from "@/lib/types";
 
 interface DashboardProps {
@@ -30,10 +30,10 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [prodsResult, movsResult, recsResult] = await Promise.all([getProducts(), getMovements(), getReceptions()]);
-      setProducts(prodsResult.products);
-      setMovements(movsResult.movements);
-      setReceptions(recsResult.receptions);
+      const [prods, movs, recs] = await Promise.all([getAllProducts(), getAllMovements(), getAllReceptions()]);
+      setProducts(prods);
+      setMovements(movs);
+      setReceptions(recs);
     } catch (error) {
       console.error("Error loading data:", error);
     } finally {
@@ -378,7 +378,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
               }}
             >
               <Clock size={18} />
-              Temps d&apos;approvisionnement
+              Temps d& apos;approvisionnement
             </h2>
             <div
               style={{

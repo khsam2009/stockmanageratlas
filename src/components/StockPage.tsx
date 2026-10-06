@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { Package, TrendingDown, AlertTriangle, ArrowUpDown, Filter, Search, Calendar, X } from "lucide-react";
-import { getProducts, getMovementsUpToDate, getLastValidatedInventoryBeforeDate } from "@/lib/firestore";
+import { getAllProducts, getMovementsFromDate } from "@/lib/firestore";
 import { useAuth } from "@/lib/AuthContext";
-import type { Product, StockMovement, Inventory } from "@/lib/types";
+import type { Product } from "@/lib/types";
 import ExportButton from "@/components/ExportButton";
 import { exportStockPDF, exportStockExcel, exportStockWord } from "@/lib/exportUtils";
 import type { StockExportItem, StockExportFilters } from "@/lib/exportUtils";
@@ -33,8 +33,7 @@ export default function StockPage() {
   const loadProducts = async () => {
     setLoading(true);
     try {
-      const result = await getProducts();
-      const allProducts = result.products;
+      const allProducts = await getAllProducts();
       
       // Extraire les catégories uniques
       const uniqueCategories = [...new Set(allProducts.map(p => p.category).filter(Boolean))] as string[];
@@ -51,69 +50,60 @@ export default function StockPage() {
     loadProducts();
   }, []);
 
-  // Load historical stock when date changes
+  // Calculate stock from movements: sum of entrees minus sum of sorties,
+  // from January 1st of the year to the selected date (or today)
   useEffect(() => {
-    if (selectedDate === "") {
-      setHistoricalStock(new Map());
+    if (products.length === 0) {
       return;
     }
 
-    const loadHistoricalStock = async () => {
+    const loadStock = async () => {
       setHistoricalLoading(true);
       try {
-        const [yearStr, monthStr, dayStr] = selectedDate.split("-");
-        const year = parseInt(yearStr);
-        const month = parseInt(monthStr) - 1; // 0-indexed
-        const day = parseInt(dayStr);
-        const endOfDay = new Date(year, month, day, 23, 59, 59, 999); // Selected date at 23:59:59
-        const startOfYear = new Date(year, 0, 1); // January 1st of selected year
-        
-        // Get last validated inventory before end of selected date
-        const lastInventory = await getLastValidatedInventoryBeforeDate(endOfDay);
-        
-        let baseStock = new Map<string, number>();
-        let movementsStartDate = startOfYear;
-        
-        if (lastInventory) {
-          // Use inventory physical stock as base
-          for (const item of lastInventory.items) {
-            baseStock.set(item.productId, item.physicalStock);
-          }
-          // Movements after inventory end date (or start date if no end date)
-          movementsStartDate = lastInventory.endDate || lastInventory.startDate;
+        let endDate: Date;
+        if (selectedDate === "") {
+          endDate = new Date();
+        } else {
+          const [yearStr, monthStr, dayStr] = selectedDate.split("-");
+          endDate = new Date(parseInt(yearStr), parseInt(monthStr) - 1, parseInt(dayStr), 23, 59, 59, 999);
         }
-        
-        // Get movements from movementsStartDate to endOfDay
-        const movements = await getMovementsUpToDate(endOfDay);
-        
-        // Filter movements after the base date
-        const relevantMovements = movements.filter(m => m.date >= movementsStartDate);
-        
-        // Apply movements to base stock
-        const stockMap = new Map<string, number>(baseStock);
-        
-        for (const movement of relevantMovements) {
+
+        const startOfYear = new Date(endDate.getFullYear(), 0, 1);
+
+        const movements = await getMovementsFromDate(startOfYear);
+
+        const stockMap = new Map<string, number>();
+        for (const product of products) {
+          stockMap.set(product.id, 0);
+        }
+
+        for (const movement of movements) {
+          if (!movement.date || movement.date > endDate) continue;
+          if (!stockMap.has(movement.productId)) continue;
+
           const current = stockMap.get(movement.productId) || 0;
           if (movement.type === "entree") {
             stockMap.set(movement.productId, current + movement.quantity);
+            console.log(`Entree: ${movement.date} - ${movement.reference} - ${movement.productName} (${movement.productId}) +${movement.quantity} => ${current + movement.quantity}`);            
           } else {
             stockMap.set(movement.productId, current - movement.quantity);
+            console.log(`Sortie: ${movement.date} - ${movement.reference} - ${movement.productName} (${movement.productId}) -${movement.quantity} => ${current - movement.quantity}`);
           }
         }
-        
+
         setHistoricalStock(stockMap);
       } catch (error) {
-        console.error("Erreur chargement stock historique:", error);
+        console.error("Erreur chargement stock:", error);
       } finally {
         setHistoricalLoading(false);
       }
     };
 
-    loadHistoricalStock();
-  }, [selectedDate]);
+    loadStock();
+  }, [selectedDate, products]);
 
   // Calculer le résumé
-  const getStock = (product: Product) => selectedDate === "" ? product.currentStock : (historicalStock.get(product.id) || 0);
+  const getStock = (product: Product) => historicalStock.get(product.id) || 0;
   
   const outOfStockCount = products.filter(p => getStock(p) <= 0).length;
   const negativeStockCount = products.filter(p => getStock(p) < 0).length;
@@ -123,7 +113,7 @@ export default function StockPage() {
   const filteredProducts = products
     .filter((p) => {
       // Get stock for this product (historical or current)
-      const stock = selectedDate === "" ? p.currentStock : (historicalStock.get(p.id) || 0);
+      const stock = historicalStock.get(p.id) || 0;
       
       // Filtre par statut positif
       if (showPositiveOnly && stock <= 0) return false;
@@ -140,8 +130,8 @@ export default function StockPage() {
       return true;
     })
     .sort((a, b) => {
-      const stockA = selectedDate === "" ? a.currentStock : (historicalStock.get(a.id) || 0);
-      const stockB = selectedDate === "" ? b.currentStock : (historicalStock.get(b.id) || 0);
+      const stockA = historicalStock.get(a.id) || 0;
+      const stockB = historicalStock.get(b.id) || 0;
       
       if (sortOrder === "asc") {
         return stockA - stockB;
@@ -515,7 +505,7 @@ export default function StockPage() {
               </thead>
               <tbody>
                 {filteredProducts.map((product) => {
-                  const stock = selectedDate === "" ? product.currentStock : (historicalStock.get(product.id) || 0);
+                  const stock = historicalStock.get(product.id) || 0;
                   const isOutOfStock = stock <= 0;
                   const isNegative = stock < 0;
                   const isLowStock = stock > 0 && stock <= (product.minStock || 0);
